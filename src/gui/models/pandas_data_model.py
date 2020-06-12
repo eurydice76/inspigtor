@@ -32,5 +32,4 @@ class PandasDataModel(QtCore.QAbstractTableModel):
 
         self._colored_rows = rows
 
-        self.dataChanged.emit(self.index(0, 0), self.index(
-            self.rowCount(), self.columnCount()), [QtCore.Qt.BackgroundRole])
+        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount(), self.columnCount()), [QtCore.Qt.BackgroundRole])
