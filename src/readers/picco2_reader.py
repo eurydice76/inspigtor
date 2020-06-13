@@ -130,7 +130,7 @@ class PiCCO2FileReader:
 
         return self._filename
 
-    def get_record_intervals(self, t_offset, t_record):
+    def get_record_intervals(self, t_record, t_offset=0, t_merge=0):
         """Computes and returns the record intervals found in the csv data. For each valid interval (i.e. intervals for which APs 
         property is a valid number), the time is splitted on the following way [offset_1,record_1,offset_2,record_2 ...].
         The records intervals are returned as a  nested list of the first and last indexes of each record interval found.
@@ -177,6 +177,27 @@ class PiCCO2FileReader:
                     stats_per_interval.append((first_record_index, index))
                     starting_index = index
 
+        if t_merge > 0:
+            to_merge = []
+            # Second pass, merge the intervals whose gap is smaller than t_merge
+            for i in range(len(stats_per_interval)-1):
+                _,last_index =  stats_per_interval[i]
+                first_index, _ =  stats_per_interval[i+1]
+                t0 = datetime.strptime(self._data['Time'].iloc[last_index-1],self._time_fmt)
+                t1 = datetime.strptime(self._data['Time'].iloc[first_index],self._time_fmt)
+                if (t1-t0).seconds < t_merge:
+                    to_merge.append(i)
+            to_merge.reverse()
+
+            for i in merge:
+                current_interval = stats_per_interval[i]
+                interval_to_merge = stats_per_interval.pop(i+1)
+                stats_per_interval[i] = (current_interval[0],interval_to_merge[1])
+
+
+
+
+
         return stats_per_interval
 
     @ property
@@ -195,5 +216,4 @@ class PiCCO2FileReader:
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    # print(reader.interval_statistics(60, 300))
-    print(reader.get_record_intervals(60, 300))
+    print(reader.get_record_intervals(300, 60))

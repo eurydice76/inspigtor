@@ -266,7 +266,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for row in range(n_pigs):
             model_index = model.index(row, 0)
             reader = model.data(model_index, 257)
-            record_intervals = reader.get_record_intervals(t_offset, t_record)
+            record_intervals = reader.get_record_intervals(t_record,t_offset)
 
             # Set the record intervals as new data (id 258)
             current_item = model.item(row, 0)
