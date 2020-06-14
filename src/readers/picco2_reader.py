@@ -59,76 +59,7 @@ class PiCCO2FileReader:
 
         csv_file.close()
 
-        self._first_valid_row = 0
-        self._last_valid_row = self._first_valid_row
-
-    def get_valid_intervals(self, selected_property='APs', t_merge=0):
-        """Returns the list of valid intervals.
-
-        A valid interval is an interval wwhere a given property has a value which can 
-        be casted to a float.
-
-        Args:
-            selected_property (str): the property used to check for valid row
-            t_merge (int): the time (in seconds) used to merge valid inervals
-
-        Returns:
-            list: the list of valid intervals
-        """
-
-        row_index = 0
-
-        # Loop first to check the first valid row (if any)
-        while True:
-
-            if row_index >= len(self._data.index):
-                break
-
-            row = self._data.iloc[row_index]
-
-            try:
-                # The row is valid
-                _ = float(row[selected_property])
-            except ValueError:
-                pass
-            else:
-                first_valid_row = row_index
-                while True:
-                    if row_index >= len(self._data.index):
-                        valid_intervals.append((first_valid_row,row_index))
-                        break
-
-                    row = self._data.iloc[row_index]
-
-                    try:
-                        # The row is valid
-                        _ = float(row[selected_property])
-                    except ValueError:
-                        valid_intervals.append((first_valid_row,row_index))
-                        break
-                    else:
-                        row_index +=1
-            finally:
-                row_index += 1
-
-        if t_merge > 0:
-            to_merge = []
-            # Second pass, merge the intervals whose gap is smaller than t_merge
-            for i in range(len(valid_intervals)-1):
-                _,last_index =  valid_intervals[i]
-                first_index, _ =  valid_intervals[i+1]
-                t0 = datetime.strptime(self._data['Time'].iloc[last_index-1],self._time_fmt)
-                t1 = datetime.strptime(self._data['Time'].iloc[first_index],self._time_fmt)
-                if (t1-t0).seconds < t_merge:
-                    to_merge.append(i)
-            to_merge.reverse()
-
-            for i in merge:
-                current_interval = valid_intervals[i]
-                interval_to_merge = valid_intervals.pop(i+1)
-                valid_intervals[i] = (current_interval[0],interval_to_merge[1])
-
-        return valid_intervals
+        self._valid_intervals = []
 
     @ property
     def data(self):
@@ -153,23 +84,39 @@ class PiCCO2FileReader:
     def get_record_intervals(self, t_record, t_offset=0, t_merge=0):
         """Computes and returns the record intervals found in the csv data. For each valid interval (i.e. intervals for which APs 
         property is a valid number), the time is splitted on the following way [offset_1,record_1,offset_2,record_2 ...].
+        Before searching fo record intervals, the valid intervals can be merged to larger one.
         The records intervals are returned as a  nested list of the first and last indexes of each record interval found.
 
         Args:
+            t_record (int): the record time in seconds
             t_offset (int): the offset time in seconds
-            t_offset (int): the record time in seconds
+            t_merge (int): the time in seconds used to merge valid intervals
 
         Returns:
             list: the list of the record intervals found in the csv data.
         """
 
-        intervals = [interval for interval in self]
-        if not intervals:
-            return []
+        # If t_merge is set merge those valid intervals whose gap in time 
+        # is smaller than t_merge 
+        if t_merge > 0:
+            to_merge = []
+            for i in range(len(self._valid_intervals)-1):
+                _,last_index =  self._valid_intervals[i]
+                first_index, _ =  self._valid_intervals[i+1]
+                t0 = datetime.strptime(self._data['Time'].iloc[last_index-1],self._time_fmt)
+                t1 = datetime.strptime(self._data['Time'].iloc[first_index],self._time_fmt)
+                if (t1-t0).seconds < t_merge:
+                    to_merge.append(i)
+            to_merge.reverse()
 
-        stats_per_interval = []
+            for i in merge:
+                current_interval = self._valid_intervals[i]
+                interval_to_merge = self._valid_intervals.pop(i+1)
+                self._valid_intervals[i] = (current_interval[0],interval_to_merge[1])
+
+        record_intervals = []
         # Loop over the valid intervals
-        for interval in intervals:
+        for interval in self._valid_intervals:
             first_index, last_index = interval
 
             starting_index = first_index
@@ -194,10 +141,10 @@ class PiCCO2FileReader:
                     index += 1
                 # A new offset-record interval is started
                 else:
-                    stats_per_interval.append((first_record_index, index))
+                    record_interval.append((first_record_index, index))
                     starting_index = index
 
-        return stats_per_interval
+        return record_interval
 
     @ property
     def parameters(self):
@@ -210,6 +157,63 @@ class PiCCO2FileReader:
         """
 
         return self._parameters
+
+    def set_valid_intervals(self, selected_property='APs'):
+        """Returns the list of valid intervals.
+
+        A valid interval is an interval wwhere a given property has a value which can 
+        be casted to a float.
+
+        Args:
+            selected_property (str): the property used to check for valid row
+        """
+
+        self._valid_intervals = []
+
+        row_index = 0
+
+        # Loop first to check the first valid row (if any)
+        while True:
+
+            if row_index >= len(self._data.index):
+                break
+
+            row = self._data.iloc[row_index]
+
+            try:
+                # The row is valid
+                _ = float(row[selected_property])
+            except ValueError:
+                pass
+            else:
+                first_valid_row = row_index
+                while True:
+                    if row_index >= len(self._data.index):
+                        self._valid_intervals.append((first_valid_row,row_index))
+                        break
+
+                    row = self._data.iloc[row_index]
+
+                    try:
+                        # The row is valid
+                        _ = float(row[selected_property])
+                    except ValueError:
+                        self._valid_intervals.append((first_valid_row,row_index))
+                        break
+                    else:
+                        row_index +=1
+            finally:
+                row_index += 1
+
+    @property
+    def valid_intervals(self):
+        """Returns the valid intervals.
+
+        Returns:
+            list: the valid intervals
+        """
+
+        return self._valid_intervals
 
 
 if __name__ == '__main__':
