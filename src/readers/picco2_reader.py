@@ -62,53 +62,73 @@ class PiCCO2FileReader:
         self._first_valid_row = 0
         self._last_valid_row = self._first_valid_row
 
-    def __next__(self):
-        """Returns the next valid interval in the reader.
+    def get_valid_intervals(self, selected_property='APs', t_merge=0):
+        """Returns the list of valid intervals.
 
-        A valid interval is an interval wwhere the property APs has a value which can be casted to a float.
+        A valid interval is an interval wwhere a given property has a value which can 
+        be casted to a float.
+
+        Args:
+            selected_property (str): the property used to check for valid row
+            t_merge (int): the time (in seconds) used to merge valid inervals
 
         Returns:
-            tuple: the next valid interval.
+            list: the list of valid intervals
         """
+
+        row_index = 0
 
         # Loop first to check the first valid row (if any)
         while True:
-            if self._first_valid_row >= len(self._data.index):
-                raise StopIteration
 
-            row = self._data.iloc[self._first_valid_row]
-            try:
-                _ = float(row['APs'])
+            if row_index >= len(self._data.index):
                 break
 
-            except ValueError:
-                self._first_valid_row += 1
+            row = self._data.iloc[row_index]
 
-        self._last_valid_row = self._first_valid_row
-
-        while True:
-            if self._last_valid_row >= len(self._data.index):
-                raise StopIteration
-            row = self._data.iloc[self._last_valid_row]
             try:
-                _ = float(row['APs'])
-                self._last_valid_row += 1
-
+                # The row is valid
+                _ = float(row[selected_property])
             except ValueError:
-                break
+                pass
+            else:
+                first_valid_row = row_index
+                while True:
+                    if row_index >= len(self._data.index):
+                        valid_intervals.append((first_valid_row,row_index))
+                        break
 
-        interval = (self._first_valid_row, self._last_valid_row)
+                    row = self._data.iloc[row_index]
 
-        self._first_valid_row = self._last_valid_row
+                    try:
+                        # The row is valid
+                        _ = float(row[selected_property])
+                    except ValueError:
+                        valid_intervals.append((first_valid_row,row_index))
+                        break
+                    else:
+                        row_index +=1
+            finally:
+                row_index += 1
 
-        return interval
+        if t_merge > 0:
+            to_merge = []
+            # Second pass, merge the intervals whose gap is smaller than t_merge
+            for i in range(len(valid_intervals)-1):
+                _,last_index =  valid_intervals[i]
+                first_index, _ =  valid_intervals[i+1]
+                t0 = datetime.strptime(self._data['Time'].iloc[last_index-1],self._time_fmt)
+                t1 = datetime.strptime(self._data['Time'].iloc[first_index],self._time_fmt)
+                if (t1-t0).seconds < t_merge:
+                    to_merge.append(i)
+            to_merge.reverse()
 
-    def __iter__(self):
+            for i in merge:
+                current_interval = valid_intervals[i]
+                interval_to_merge = valid_intervals.pop(i+1)
+                valid_intervals[i] = (current_interval[0],interval_to_merge[1])
 
-        self._first_valid_row = 0
-        self._last_valid_row = self._first_valid_row
-
-        return self
+        return valid_intervals
 
     @ property
     def data(self):
@@ -176,27 +196,6 @@ class PiCCO2FileReader:
                 else:
                     stats_per_interval.append((first_record_index, index))
                     starting_index = index
-
-        if t_merge > 0:
-            to_merge = []
-            # Second pass, merge the intervals whose gap is smaller than t_merge
-            for i in range(len(stats_per_interval)-1):
-                _,last_index =  stats_per_interval[i]
-                first_index, _ =  stats_per_interval[i+1]
-                t0 = datetime.strptime(self._data['Time'].iloc[last_index-1],self._time_fmt)
-                t1 = datetime.strptime(self._data['Time'].iloc[first_index],self._time_fmt)
-                if (t1-t0).seconds < t_merge:
-                    to_merge.append(i)
-            to_merge.reverse()
-
-            for i in merge:
-                current_interval = stats_per_interval[i]
-                interval_to_merge = stats_per_interval.pop(i+1)
-                stats_per_interval[i] = (current_interval[0],interval_to_merge[1])
-
-
-
-
 
         return stats_per_interval
 
