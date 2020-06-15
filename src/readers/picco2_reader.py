@@ -52,6 +52,7 @@ class PiCCO2FileReader:
         self._parameters = {**pig_id_dict, **general_info_dict}
 
         self._data = pd.read_csv(self._filename, sep=';', skiprows=7, skipfooter=1, engine='python')
+
         self._data = self._data.sort_values(by=['Time'])
 
         self._time_fmt = '%H:%M:%S'
@@ -96,23 +97,23 @@ class PiCCO2FileReader:
             list: the list of the record intervals found in the csv data.
         """
 
-        # If t_merge is set merge those valid intervals whose gap in time 
-        # is smaller than t_merge 
+        # If t_merge is set merge those valid intervals whose gap in time
+        # is smaller than t_merge
         if t_merge > 0:
             to_merge = []
             for i in range(len(self._valid_intervals)-1):
-                _,last_index =  self._valid_intervals[i]
-                first_index, _ =  self._valid_intervals[i+1]
-                t0 = datetime.strptime(self._data['Time'].iloc[last_index-1],self._time_fmt)
-                t1 = datetime.strptime(self._data['Time'].iloc[first_index],self._time_fmt)
+                _, last_index = self._valid_intervals[i]
+                first_index, _ = self._valid_intervals[i+1]
+                t0 = datetime.strptime(self._data['Time'].iloc[last_index-1], self._time_fmt)
+                t1 = datetime.strptime(self._data['Time'].iloc[first_index], self._time_fmt)
                 if (t1-t0).seconds < t_merge:
                     to_merge.append(i)
             to_merge.reverse()
 
-            for i in merge:
-                current_interval = self._valid_intervals[i]
-                interval_to_merge = self._valid_intervals.pop(i+1)
-                self._valid_intervals[i] = (current_interval[0],interval_to_merge[1])
+            for interval in to_merge:
+                current_interval = self._valid_intervals[interval]
+                interval_to_merge = self._valid_intervals.pop(interval+1)
+                self._valid_intervals[interval] = (current_interval[0], interval_to_merge[1])
 
         record_intervals = []
         # Loop over the valid intervals
@@ -138,13 +139,15 @@ class PiCCO2FileReader:
                     if first:
                         first_record_index = index
                         first = False
+
                     index += 1
                 # A new offset-record interval is started
                 else:
-                    record_interval.append((first_record_index, index))
+                    record_intervals.append((first_record_index, index))
                     starting_index = index
+                    first = True
 
-        return record_interval
+        return record_intervals
 
     @ property
     def parameters(self):
@@ -189,7 +192,7 @@ class PiCCO2FileReader:
                 first_valid_row = row_index
                 while True:
                     if row_index >= len(self._data.index):
-                        self._valid_intervals.append((first_valid_row,row_index))
+                        self._valid_intervals.append((first_valid_row, row_index))
                         break
 
                     row = self._data.iloc[row_index]
@@ -198,10 +201,10 @@ class PiCCO2FileReader:
                         # The row is valid
                         _ = float(row[selected_property])
                     except ValueError:
-                        self._valid_intervals.append((first_valid_row,row_index))
+                        self._valid_intervals.append((first_valid_row, row_index))
                         break
                     else:
-                        row_index +=1
+                        row_index += 1
             finally:
                 row_index += 1
 
