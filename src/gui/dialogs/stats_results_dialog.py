@@ -12,19 +12,19 @@ class StatsResultsDialog(QtWidgets.QDialog):
 
         super(StatsResultsDialog, self).__init__()
 
-        self.setWindowTitle('Statistics')
-
         self._main_window = main_window
 
         self.init_ui()
 
     def build_events(self):
-        """Set the signal:slots of the main window
+        """Set the signal/slots of the main window
         """
 
         self._selected_pig_combo.currentIndexChanged.connect(self.on_select_pig)
 
     def build_layout(self):
+        """Build the layout.
+        """
 
         self._main_layout = QtWidgets.QVBoxLayout()
 
@@ -38,6 +38,10 @@ class StatsResultsDialog(QtWidgets.QDialog):
         self.setLayout(self._main_layout)
 
     def build_widgets(self):
+        """Build and/or initialize the widgets of the dialog.
+        """
+
+        self.setWindowTitle('Statistics')
 
         # Build the matplotlib imsho widget
         self._figure = Figure()
@@ -59,7 +63,7 @@ class StatsResultsDialog(QtWidgets.QDialog):
         self._selected_pig_combo.addItems(pig_names)
 
     def init_ui(self):
-        """
+        """Initialiwes the dialog.
         """
 
         self.build_widgets()
@@ -71,11 +75,15 @@ class StatsResultsDialog(QtWidgets.QDialog):
         self.on_select_pig(0)
 
     def on_select_pig(self, row):
+        """Plot the averages and standard deviations over record intervals for a selected pig.
 
-        # Fetch the model behind pigs list view
+        Args:
+            row (int): the selected pig
+        """
+
+        # Fetch the statistics (average and standard deviation) for the selected pig
         pigs_list = self._main_window._pigs_list
         model = pigs_list.model()
-
         selected_pig_item = model.item(row, 0)
         stats = selected_pig_item.data(259)
 
@@ -84,9 +92,11 @@ class StatsResultsDialog(QtWidgets.QDialog):
 
         x_values = range(len(averages))
 
+        # If there is already a plot, remove it
         if hasattr(self, '_axes'):
             self._axes.remove()
 
+        # Plot the averages and standard deviations
         self._axes = self._figure.add_subplot(111)
         self._axes.set_xlabel('interval')
         self._axes.set_ylabel(stats['selected_property'])
