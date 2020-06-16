@@ -38,50 +38,50 @@ class MainWindow(QtWidgets.QMainWindow):
         """Build the layout of the main window.
         """
 
-        self._main_layout = QtWidgets.QVBoxLayout()
+        main_layout = QtWidgets.QVBoxLayout()
 
-        self._hl1 = QtWidgets.QHBoxLayout()
+        hl1 = QtWidgets.QHBoxLayout()
 
         self._valid_interval_layout = QtWidgets.QHBoxLayout()
         self._valid_interval_layout.addWidget(self._valid_property_combo)
         self._valid_interval_layout.addWidget(self._search_valid_intervals_button)
 
-        self._hl111 = QtWidgets.QHBoxLayout()
+        hl111 = QtWidgets.QHBoxLayout()
 
-        self._hl111.addWidget(self._times_groupbox)
-        self._hl1111 = QtWidgets.QHBoxLayout()
+        hl111.addWidget(self._times_groupbox)
+        hl1111 = QtWidgets.QHBoxLayout()
 
-        self._hl1111.addWidget(self._t_record_label)
-        self._hl1111.addWidget(self._t_record)
-        self._hl1111.addWidget(self._t_offset_label)
-        self._hl1111.addWidget(self._t_offset)
-        self._hl1111.addWidget(self._t_merge_label)
-        self._hl1111.addWidget(self._t_merge)
+        hl1111.addWidget(self._t_record_label)
+        hl1111.addWidget(self._t_record)
+        hl1111.addWidget(self._t_offset_label)
+        hl1111.addWidget(self._t_offset)
+        hl1111.addWidget(self._t_merge_label)
+        hl1111.addWidget(self._t_merge)
 
-        self._times_groupbox.setLayout(self._hl1111)
+        self._times_groupbox.setLayout(hl1111)
 
-        self._hl112 = QtWidgets.QHBoxLayout()
-        self._hl112.addWidget(self._search_intervals_button)
+        hl112 = QtWidgets.QHBoxLayout()
+        hl112.addWidget(self._search_intervals_button)
 
-        self._hl113 = QtWidgets.QHBoxLayout()
-        self._hl113.addWidget(self._compute_property_combo)
-        self._hl113.addWidget(self._compute_button)
+        hl113 = QtWidgets.QHBoxLayout()
+        hl113.addWidget(self._compute_property_combo)
+        hl113.addWidget(self._compute_button)
 
-        self._vl11 = QtWidgets.QVBoxLayout()
-        self._vl11.addWidget(self._pigs_list)
-        self._vl11.addLayout(self._valid_interval_layout)
-        self._vl11.addLayout(self._hl111)
-        self._vl11.addLayout(self._hl112)
-        self._vl11.addLayout(self._hl113)
+        vl11 = QtWidgets.QVBoxLayout()
+        vl11.addWidget(self._pigs_list)
+        vl11.addLayout(self._valid_interval_layout)
+        vl11.addLayout(hl111)
+        vl11.addLayout(hl112)
+        vl11.addLayout(hl113)
 
-        self._hl1.addLayout(self._vl11)
-        self._hl1.addWidget(self._intervals_list)
+        hl1.addLayout(vl11)
+        hl1.addWidget(self._intervals_list)
 
-        self._main_layout.addLayout(self._hl1)
+        main_layout.addLayout(hl1)
 
-        self._main_layout.addWidget(self._data_table)
+        main_layout.addWidget(self._data_table)
 
-        self._main_frame.setLayout(self._main_layout)
+        self._main_frame.setLayout(main_layout)
 
     def build_menu(self):
         """Build the menu of the main window.
