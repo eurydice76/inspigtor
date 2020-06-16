@@ -45,8 +45,6 @@ class StatsResultsDialog(QtWidgets.QDialog):
 
         # Build the matplotlib imsho widget
         self._figure = Figure()
-        # self._axes.set_xticks(range(self._reader.n_frames))
-        # self._axes.set_yticks(range(0, 2))
         self._canvas = FigureCanvasQTAgg(self._figure)
         self._toolbar = NavigationToolbar2QT(self._canvas, self)
 
