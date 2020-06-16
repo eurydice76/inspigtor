@@ -5,3 +5,4 @@ __pycache__
 *.so
 connectivity.cpp
 *.html
+*lock*
