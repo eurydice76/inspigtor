@@ -10,7 +10,7 @@ class MultipleDirectoriesSelector(QtWidgets.QFileDialog):
         self.setFileMode(self.DirectoryOnly)
 
         self.tree = self.findChild(QtWidgets.QTreeView)
-        self.tree.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+        self.tree.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         self.list = self.findChild(QtWidgets.QListView)
-        self.list.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+        self.list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)

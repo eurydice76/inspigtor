@@ -68,6 +68,8 @@ class StatsResultsDialog(QtWidgets.QDialog):
 
         self.build_events()
 
+        self.on_select_pig(0)
+
     def on_select_pig(self, row):
 
         # Fetch the model behind pigs list view
