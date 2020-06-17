@@ -35,6 +35,9 @@ class PiCCO2FileReader:
         # Create a dict outof those parameters
         general_info_dict = collections.OrderedDict(zip(general_info_fields, general_info))
 
+        if 'T0' not in general_info_dict:
+            raise IOError('Missing T0 value in the general parameters section.')
+
         # Read the fourth line which contains the titles of the pig id parameters
         line = csv_file.readline().strip()
         line = line[:-1] if line.endswith(';') else line
@@ -57,6 +60,20 @@ class PiCCO2FileReader:
 
         self._time_fmt = '%H:%M:%S'
         self._exp_start = datetime.strptime(self._data.iloc[0]['Time'], self._time_fmt)
+
+        delta_t = [str(datetime.strptime(t, self._time_fmt) - self._exp_start) for t in self._data['Time']]
+        self._data.insert(loc=2, column='delta_t', value=delta_t)
+
+        valid_t0 = False
+        for i, t in enumerate(self._data['Time']):
+            delta_t = datetime.strptime(t, self._time_fmt) - datetime.strptime(general_info_dict['T0'].split()[0], self._time_fmt)
+            if delta_t.days >= 0:
+                self._t0_index = i-1
+                valid_t0 = True
+                break
+
+        if not valid_t0:
+            raise IOError('Invalid value for T0 parameters')
 
         csv_file.close()
 
@@ -222,4 +239,3 @@ class PiCCO2FileReader:
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    print(reader.get_record_intervals(300, 60))
