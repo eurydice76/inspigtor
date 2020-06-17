@@ -389,7 +389,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         model = self._data_table.model()
 
+        # Color in grey the selected record interval
         model.setColoredRows(dict([(r, QtGui.QColor('gray')) for r in range(row_min, row_max)]))
+
+        # Displace the cursor of the data table to the first index of the selected record interval
+        index = model.index(row_min, 0)
+        self._data_table.setCurrentIndex(index)
 
     def on_select_pig(self, index):
 
@@ -403,8 +408,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if reader is None:
             return
 
+        # Update the data table with the selected data
         data = reader.data
-
         self._data_table.setModel(PandasDataModel(data))
 
         self._valid_property_combo.clear()
