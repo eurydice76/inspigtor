@@ -56,28 +56,41 @@ class PiCCO2FileReader:
 
         self._data = pd.read_csv(self._filename, sep=';', skiprows=7, skipfooter=1, engine='python')
 
+        # Some times are not placed in chronological order in the csv file, so sort them before doing anything
         self._data = self._data.sort_values(by=['Time'])
 
         self._time_fmt = '%H:%M:%S'
         self._exp_start = datetime.strptime(self._data.iloc[0]['Time'], self._time_fmt)
 
-        delta_t = [str(datetime.strptime(t, self._time_fmt) - self._exp_start) for t in self._data['Time']]
-        self._data.insert(loc=2, column='delta_t', value=delta_t)
+        # The evaluation of intervals starts at t0 - 10 minutes (as asked by experimentalist)
+        t_minus_10_strptime = datetime.strptime(general_info_dict['T0'], self._time_fmt) - datetime.strptime('00:10:00', self._time_fmt)
+        t_minus_10_strptime = datetime.strptime(str(t_minus_10_strptime), self._time_fmt)
 
-        valid_t0 = False
+        self._t_minus_10_index = 0
+
+        valid_t_minus_10 = False
+        delta_ts = []
+        first = True
         for i, t in enumerate(self._data['Time']):
-            delta_t = datetime.strptime(t, self._time_fmt) - datetime.strptime(general_info_dict['T0'].split()[0], self._time_fmt)
+            delta_t = datetime.strptime(t, self._time_fmt) - t_minus_10_strptime
+            # If the difference between the current time and t0 - 10 is positive for the first time, then record the corresponding
+            # index as being the reference time
             if delta_t.days >= 0:
-                self._t0_index = i-1
-                valid_t0 = True
-                break
+                delta_ts.append(str(delta_t))
+                if first:
+                    self._t_minus_10_index = i
+                    valid_t_minus_10 = True
+                    first = False
+            else:
+                delta_ts.append('-'+str(-delta_t))
 
-        if not valid_t0:
+        if not valid_t_minus_10:
             raise IOError('Invalid value for T0 parameters')
 
-        csv_file.close()
+        # Add a column to the original data which show the delta t regarding t0 - 10 minutes
+        self._data.insert(loc=2, column='delta_t', value=delta_ts)
 
-        self._valid_intervals = []
+        csv_file.close()
 
     @ property
     def data(self):
@@ -99,69 +112,65 @@ class PiCCO2FileReader:
 
         return self._filename
 
-    def get_record_intervals(self, t_record, t_offset=0, t_merge=0):
-        """Computes and returns the record intervals found in the csv data. For each valid interval (i.e. intervals for which APs 
-        property is a valid number), the time is splitted on the following way [offset_1,record_1,offset_2,record_2 ...].
-        Before searching fo record intervals, the valid intervals can be merged to larger one.
-        The records intervals are returned as a  nested list of the first and last indexes of each record interval found.
+    def get_record_intervals(self, intervals):
+        """Computes and returns the record intervals found in the csv data.
 
         Args:
             t_record (int): the record time in seconds
             t_offset (int): the offset time in seconds
-            t_merge (int): the time in seconds used to merge valid intervals
 
         Returns:
             list: the list of the record intervals found in the csv data.
         """
 
-        # If t_merge is set merge those valid intervals whose gap in time
-        # is smaller than t_merge
-        if t_merge > 0:
-            to_merge = []
-            for i in range(len(self._valid_intervals)-1):
-                _, last_index = self._valid_intervals[i]
-                first_index, _ = self._valid_intervals[i+1]
-                t0 = datetime.strptime(self._data['Time'].iloc[last_index-1], self._time_fmt)
-                t1 = datetime.strptime(self._data['Time'].iloc[first_index], self._time_fmt)
-                if (t1-t0).seconds < t_merge:
-                    to_merge.append(i)
-            to_merge.reverse()
+        n_times = len(self._data['Time'])
 
-            for interval in to_merge:
-                current_interval = self._valid_intervals[interval]
-                interval_to_merge = self._valid_intervals.pop(interval+1)
-                self._valid_intervals[interval] = (current_interval[0], interval_to_merge[1])
+        t0 = datetime.strptime(self._data['Time'].iloc[self._t_minus_10_index], self._time_fmt)
 
         record_intervals = []
-        # Loop over the valid intervals
-        for interval in self._valid_intervals:
-            first_index, last_index = interval
 
-            starting_index = first_index
-            index = starting_index
+        for interval in intervals:
+            start, end, record, offset = interval
+            start = (datetime.strptime(start, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
+            end = (datetime.strptime(end, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
+
+            enter_interval = True
+            exit_interval = True
+            for t_index in range(self._t_minus_10_index, n_times):
+                delta_t = (datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt) - t0).seconds
+                if delta_t < start:
+                    continue
+                else:
+                    if delta_t < end:
+                        if enter_interval:
+                            first_record_index = t_index
+                            enter_interval = False
+                    else:
+                        if exit_interval:
+                            last_record_index = t_index
+                            exit_interval = False
+
             first = True
-            first_record_index = None
-            while True:
-                if index == last_index:
-                    break
-                t0 = datetime.strptime(self._data.iloc[starting_index]['Time'], self._time_fmt)
-                t1 = datetime.strptime(self._data.iloc[index]['Time'], self._time_fmt)
+            starting_index = first_record_index
+            for t_index in range(first_record_index, last_record_index):
+                t0 = datetime.strptime(self._data['Time'].iloc[starting_index], self._time_fmt)
+                t1 = datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt)
                 delta_t = (t1 - t0).seconds
 
                 # Case of a time within the offset, skip.
-                if delta_t < t_offset:
-                    index += 1
+                if delta_t < offset:
+                    continue
                 # Case of a time within the record interval, save the first time of the record interval
-                elif (delta_t >= t_offset) and (delta_t < t_offset + t_record):
+                elif (delta_t >= offset) and (delta_t < offset + record):
                     if first:
-                        first_record_index = index
+                        first_record_index = t_index
                         first = False
 
-                    index += 1
+                    continue
                 # A new offset-record interval is started
                 else:
-                    record_intervals.append((first_record_index, index))
-                    starting_index = index
+                    record_intervals.append((first_record_index, t_index))
+                    starting_index = t_index
                     first = True
 
         return record_intervals
@@ -178,64 +187,8 @@ class PiCCO2FileReader:
 
         return self._parameters
 
-    def set_valid_intervals(self, selected_property='APs'):
-        """Returns the list of valid intervals.
-
-        A valid interval is an interval wwhere a given property has a value which can 
-        be casted to a float.
-
-        Args:
-            selected_property (str): the property used to check for valid row
-        """
-
-        self._valid_intervals = []
-
-        row_index = 0
-
-        # Loop first to check the first valid row (if any)
-        while True:
-
-            if row_index >= len(self._data.index):
-                break
-
-            row = self._data.iloc[row_index]
-
-            try:
-                # The row is valid
-                _ = float(row[selected_property])
-            except ValueError:
-                pass
-            else:
-                first_valid_row = row_index
-                while True:
-                    if row_index >= len(self._data.index):
-                        self._valid_intervals.append((first_valid_row, row_index))
-                        break
-
-                    row = self._data.iloc[row_index]
-
-                    try:
-                        # The row is valid
-                        _ = float(row[selected_property])
-                    except ValueError:
-                        self._valid_intervals.append((first_valid_row, row_index))
-                        break
-                    else:
-                        row_index += 1
-            finally:
-                row_index += 1
-
-    @property
-    def valid_intervals(self):
-        """Returns the valid intervals.
-
-        Returns:
-            list: the valid intervals
-        """
-
-        return self._valid_intervals
-
 
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
+    print(reader.get_record_intervals([('00:00:00', '00:15:00', 300, 60)]))

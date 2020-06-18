@@ -2,22 +2,23 @@ import glob
 import os
 import sys
 
-import numpy as np
-
 from PyQt5.QtCore import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 import inspigtor
 from inspigtor.__pkginfo__ import __version__
-from inspigtor.readers.picco2_reader import PiCCO2FileReader
 from inspigtor.gui.dialogs.property_plotter_dialog import PropertyPlotterDialog
-from inspigtor.gui.dialogs.stats_results_dialog import StatsResultsDialog
 from inspigtor.gui.models.pandas_data_model import PandasDataModel
+from inspigtor.gui.views.pigs_view import PigsView
+from inspigtor.gui.widgets.intervals_widget import IntervalsWidget
 from inspigtor.gui.widgets.multiple_directories_selector import MultipleDirectoriesSelector
-from inspigtor.gui.widgets.pigs_view import PigsView
+from inspigtor.gui.widgets.statistics_widget import StatisticsWidget
+from inspigtor.readers.picco2_reader import PiCCO2FileReader
 
 
 class MainWindow(QtWidgets.QMainWindow):
+
+    pig_selected = QtCore.pyqtSignal(PiCCO2FileReader, list)
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -25,14 +26,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.init_ui()
 
     def build_events(self):
-        """Set the signal:slots of the main window
-        """
 
-        self._compute_button.clicked.connect(self.on_compute_averages)
-        self._search_valid_intervals_button.clicked.connect(self.on_search_valid_intervals)
-        self._search_intervals_button.clicked.connect(self.on_search_record_intervals)
-        self._pigs_list.double_clicked_empty.connect(self.on_open_experimental_dirs)
         self._data_table.customContextMenuRequested.connect(self.on_show_data_table_menu)
+        self._pigs_list.double_clicked_empty.connect(self.on_open_experimental_dirs)
+        self._intervals_widget.record_interval_selected.connect(self.on_record_interval_selected)
 
     def build_layout(self):
         """Build the layout of the main window.
@@ -40,44 +37,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         main_layout = QtWidgets.QVBoxLayout()
 
-        hl1 = QtWidgets.QHBoxLayout()
+        hlayout = QtWidgets.QHBoxLayout()
+        hlayout.addWidget(self._pigs_list)
+        hlayout.addWidget(self._tabs)
 
-        self._valid_interval_layout = QtWidgets.QHBoxLayout()
-        self._valid_interval_layout.addWidget(self._valid_property_combo)
-        self._valid_interval_layout.addWidget(self._search_valid_intervals_button)
-
-        hl111 = QtWidgets.QHBoxLayout()
-
-        hl111.addWidget(self._times_groupbox)
-        hl1111 = QtWidgets.QHBoxLayout()
-
-        hl1111.addWidget(self._t_record_label)
-        hl1111.addWidget(self._t_record)
-        hl1111.addWidget(self._t_offset_label)
-        hl1111.addWidget(self._t_offset)
-        hl1111.addWidget(self._t_merge_label)
-        hl1111.addWidget(self._t_merge)
-
-        self._times_groupbox.setLayout(hl1111)
-
-        hl112 = QtWidgets.QHBoxLayout()
-        hl112.addWidget(self._search_intervals_button)
-
-        hl113 = QtWidgets.QHBoxLayout()
-        hl113.addWidget(self._compute_property_combo)
-        hl113.addWidget(self._compute_button)
-
-        vl11 = QtWidgets.QVBoxLayout()
-        vl11.addWidget(self._pigs_list)
-        vl11.addLayout(self._valid_interval_layout)
-        vl11.addLayout(hl111)
-        vl11.addLayout(hl112)
-        vl11.addLayout(hl113)
-
-        hl1.addLayout(vl11)
-        hl1.addWidget(self._intervals_list)
-
-        main_layout.addLayout(hl1)
+        main_layout.addLayout(hlayout)
 
         main_layout.addWidget(self._data_table)
 
@@ -110,43 +74,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._main_frame = QtWidgets.QFrame(self)
 
         self._pigs_list = PigsView()
+        self._pigs_list.setDragEnabled(True)
         model = QtGui.QStandardItemModel()
         self._pigs_list.setModel(model)
-        self._pigs_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-
-        self._valid_property_combo = QtWidgets.QComboBox()
-        self._search_valid_intervals_button = QtWidgets.QPushButton('Search valid intervals')
-
-        self._times_groupbox = QtWidgets.QGroupBox('Times (s)')
-
-        self._t_record_label = QtWidgets.QLabel('Record')
-        self._t_record_label.setToolTip('The duration of for which the time will be considered for further analysis.')
-        self._t_record = QtWidgets.QSpinBox()
-        self._t_record.setMinimum(0)
-        self._t_record.setMaximum(10000)
-        self._t_record.setValue(300)
-
-        self._t_offset_label = QtWidgets.QLabel('Offset')
-        self._t_offset_label.setToolTip('The offset preceeding each recording.')
-        self._t_offset = QtWidgets.QSpinBox()
-        self._t_offset.setMinimum(0)
-        self._t_offset.setValue(60)
-
-        self._t_merge_label = QtWidgets.QLabel('Merge')
-        self._t_merge_label.setToolTip('The time used to merge those intervals whose gap in time is smaller than the input value.')
-        self._t_merge = QtWidgets.QSpinBox()
-        self._t_merge.setMinimum(0)
-        self._t_merge.setValue(0)
-
-        self._search_intervals_button = QtWidgets.QPushButton('Search record intervals')
-
-        self._compute_property_combo = QtWidgets.QComboBox()
-        self._compute_button = QtWidgets.QPushButton('Compute averages')
-
-        self._intervals_list = QtWidgets.QListView()
-        model = QtGui.QStandardItemModel()
-        self._intervals_list.setModel(model)
-        self._intervals_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self._pigs_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         self._data_table = QtWidgets.QTableView()
         self._data_table.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
@@ -157,6 +88,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setGeometry(0, 0, 800, 800)
 
         self.setWindowTitle("inspigtor {}".format(__version__))
+
+        self._tabs = QtWidgets.QTabWidget()
+
+        self._intervals_widget = IntervalsWidget(self)
+        self._statistics_widget = StatisticsWidget(self)
+
+        self._tabs.addTab(self._intervals_widget, 'Intervals')
+        self._tabs.addTab(self._statistics_widget, 'Statistics')
 
         self._progress_label = QtWidgets.QLabel('Progress')
         self._progress_bar = QtWidgets.QProgressBar()
@@ -169,71 +108,29 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.show()
 
+    def init_progress_bar(self, n_steps):
+
+        self._progress_bar.setMinimum(0)
+        self._progress_bar.setMaximum(n_steps)
+
     def init_ui(self):
         """Set the widgets of the main window
         """
 
         self._reader = None
 
-        self.build_menu()
-
         self.build_widgets()
 
         self.build_layout()
 
+        self.build_menu()
+
         self.build_events()
 
-    def on_compute_averages(self):
-        """Computes the average of a given property
-        """
+    @property
+    def intervals_widget(self):
 
-        model = self._pigs_list.model()
-
-        n_pigs = model.rowCount()
-
-        if n_pigs == 0:
-            return
-
-        selected_property = self._compute_property_combo.currentText()
-
-        self._progress_bar.setMinimum(0)
-        self._progress_bar.setMaximum(n_pigs)
-
-        # Loop over the pigs
-        for row in range(n_pigs):
-
-            # Fetch the pig's reader
-            model_index = model.index(row, 0)
-            current_item = model.item(row, 0)
-            reader = model.data(model_index, 257)
-            data = reader.data
-
-            # Fetch the record interval
-            record_intervals = model.data(model_index, 258)
-
-            results = {'selected_property': selected_property, 'stats': []}
-
-            # Compute for each record interval the average and standard deviation of the selected property
-            for interval in record_intervals:
-                first_index, last_index = interval
-                values = []
-                for i in range(first_index, last_index):
-                    try:
-                        values.append(float(data[selected_property].iloc[i]))
-                    except ValueError:
-                        continue
-                if not values:
-                    results['stats'].append(None)
-                else:
-                    avg = np.average(values)
-                    std = np.std(values)
-                    results['stats'].append((avg, std))
-
-            current_item.setData(results, 259)
-            self._progress_bar.setValue(row+1)
-
-        dialog = StatsResultsDialog(self)
-        dialog.exec_()
+        return self._intervals_widget
 
     def on_open_experimental_dirs(self):
         """Opens several experimental directories.
@@ -251,8 +148,9 @@ class MainWindow(QtWidgets.QMainWindow):
         model = QtGui.QStandardItemModel()
         self._pigs_list.setModel(model)
 
-        self._progress_bar.setMinimum(0)
-        self._progress_bar.setMaximum(len(experimental_dirs))
+        self.init_progress_bar(len(experimental_dirs))
+
+        filenames = []
 
         # Loop over the pig directories
         for progress, exp_dir in enumerate(experimental_dirs):
@@ -263,7 +161,8 @@ class MainWindow(QtWidgets.QMainWindow):
             # Loop over the Data*csv csv files found in the current oig directory
             for data_file in data_files:
                 data_file_basename = os.path.basename(data_file)
-                item = QtGui.QStandardItem(os.path.join(exp_dir_basename, data_file_basename))
+                filename = os.path.join(exp_dir_basename, data_file_basename)
+                item = QtGui.QStandardItem(filename)
                 # Reads the csv file and bind it to the model's item
                 reader = PiCCO2FileReader(data_file)
                 item.setData(reader, 257)
@@ -272,10 +171,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 item.setData("\n".join([": ".join([k, v]) for k, v in reader.parameters.items()]), QtCore.Qt.ToolTipRole)
                 model.appendRow(item)
 
-            self._progress_bar.setValue(progress+1)
+                filenames.append(filename)
+
+            self.update_progress_bar(progress+1)
 
         # Create a signal/slot connexion for row changed event
         self._pigs_list.selectionModel().currentChanged.connect(self.on_select_pig)
+
+        self._pigs_list.setCurrentIndex(self._pigs_list.model().index(0, 0))
 
     def on_plot_property(self, checked, selected_property):
         """Plot one property of the PiCCO file.
@@ -283,8 +186,6 @@ class MainWindow(QtWidgets.QMainWindow):
         Args:
             selected_property (str): the property to plot
         """
-
-        data_model = self._data_table.model()
 
         pigs_model = self._pigs_list.model()
 
@@ -320,72 +221,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if choice == QtWidgets.QMessageBox.Yes:
             sys.exit()
 
-    def on_search_record_intervals(self):
-        """Event handler called when the search record intervals buton is clicked.
-
-        Compute for the selected pig the record intervals.
-        """
-
-        t_record = self._t_record.value()
-        t_offset = self._t_offset.value()
-        t_merge = self._t_merge.value()
-
-        model = self._pigs_list.model()
-
-        n_pigs = model.rowCount()
-        if n_pigs == 0:
-            return
-
-        self._progress_bar.setMinimum(0)
-        self._progress_bar.setMaximum(n_pigs)
-
-        for row in range(n_pigs):
-            model_index = model.index(row, 0)
-            reader = model.data(model_index, 257)
-            record_intervals = reader.get_record_intervals(t_record, t_offset=t_offset, t_merge=t_merge)
-
-            # Set the record intervals as new data (id 258)
-            current_item = model.item(row, 0)
-            current_item.setData(record_intervals, 258)
-            current_item.setData({}, 259)
-
-            self._progress_bar.setValue(row+1)
-
-        self.on_select_pig(model.index(0, 0))
-
-    def on_search_valid_intervals(self):
-
-        pigs_model = self._pigs_list.model()
-
-        n_pigs = pigs_model.rowCount()
-        if n_pigs == 0:
-            return
-
-        selected_property = self._valid_property_combo.currentText()
-
-        self._progress_bar.setMinimum(0)
-        self._progress_bar.setMaximum(n_pigs)
-
-        for row in range(n_pigs):
-
-            current_item = pigs_model.item(row, 0)
-            reader = current_item.data(257)
-
-            reader.set_valid_intervals(selected_property=selected_property)
-
-            self._progress_bar.setValue(row+1)
-
-    def on_select_interval(self, index):
-        """Event handler for interval selection.
-
-        It will grey the data table for the corresponding interval
-        """
-
-        model = self._intervals_list.model()
-
-        item = model.item(index.row(), index.column())
-
-        row_min, row_max = item.data()
+    def on_record_interval_selected(self, row_min, row_max):
 
         model = self._data_table.model()
 
@@ -400,10 +236,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         item = self._pigs_list.model().item(index.row(), index.column())
 
-        model = QtGui.QStandardItemModel()
-        self._intervals_list.setModel(model)
-        self._intervals_list.selectionModel().currentChanged.connect(self.on_select_interval)
-
         reader = item.data(257)
         if reader is None:
             return
@@ -412,26 +244,11 @@ class MainWindow(QtWidgets.QMainWindow):
         data = reader.data
         self._data_table.setModel(PandasDataModel(data))
 
-        self._valid_property_combo.clear()
-        self._valid_property_combo.addItems(data.columns)
-        index = self._valid_property_combo.findText('APs', QtCore.Qt.MatchFixedString)
-        if index >= 0:
-            self._valid_property_combo.setCurrentIndex(index)
-
-        self._compute_property_combo.clear()
-        self._compute_property_combo.addItems(data.columns)
-        index = self._compute_property_combo.findText('APs', QtCore.Qt.MatchFixedString)
-        if index >= 0:
-            self._compute_property_combo.setCurrentIndex(index)
-
         record_intervals = item.data(258)
         if record_intervals is None:
-            return
+            record_intervals = []
 
-        for i, interval in enumerate(record_intervals):
-            item = QtGui.QStandardItem('interval {}'.format(i+1))
-            item.setData(interval)
-            model.appendRow(item)
+        self.pig_selected.emit(reader, record_intervals)
 
     def on_show_data_table_menu(self, point):
 
@@ -454,6 +271,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         menu.addMenu(plot_menu)
         menu.exec_(QtGui.QCursor.pos())
+
+    @property
+    def pigs_list(self):
+        return self._pigs_list
+
+    def update_progress_bar(self, step):
+
+        self._progress_bar.setValue(step)
 
 
 if __name__ == "__main__":

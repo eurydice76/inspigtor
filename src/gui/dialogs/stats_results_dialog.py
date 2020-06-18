@@ -49,8 +49,7 @@ class StatsResultsDialog(QtWidgets.QDialog):
         self._toolbar = NavigationToolbar2QT(self._canvas, self)
 
         # Fetch the model behind pigs list view
-        pigs_list = self._main_window._pigs_list
-        model = pigs_list.model()
+        model = self._main_window.pigs_list.model()
 
         pig_names = []
         for row in range(model.rowCount()):
@@ -85,10 +84,15 @@ class StatsResultsDialog(QtWidgets.QDialog):
         selected_pig_item = model.item(row, 0)
         stats = selected_pig_item.data(259)
 
-        averages = np.array([v[0] for v in stats['stats']])
-        stds = np.array([v[1] for v in stats['stats']])
-
-        x_values = range(len(averages))
+        xs = []
+        averages = []
+        stds = []
+        for i, v in enumerate(stats['stats']):
+            if v is None:
+                continue
+            xs.append(i+1)
+            averages.append(v[0])
+            stds.append(v[1])
 
         # If there is already a plot, remove it
         if hasattr(self, '_axes'):
@@ -100,6 +104,6 @@ class StatsResultsDialog(QtWidgets.QDialog):
         self._axes.set_ylabel(stats['selected_property'])
         self._axes.set_xlim([-1, len(averages)])
 
-        self._plot = self._axes.errorbar(x_values, averages, yerr=stds, fmt='ro')
+        self._plot = self._axes.errorbar(xs, averages, yerr=stds, fmt='ro')
 
         self._canvas.draw()
