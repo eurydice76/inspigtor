@@ -13,12 +13,27 @@ class TimeValidator(QtGui.QValidator):
         """Validate the string.
         """
 
+        regexp = '^([0-9]?):([0-9]?):([0-9]?)$'
+        match = re.match(regexp, value)
+
         regexp = '^(0[0-9]|1[0-9]|2[0-3]):(0[0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9]):(0[0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])$'
         match = re.match(regexp, value)
         if match is None:
-            return (QtGui.QValidator.Invalid, value, pos)
+            regexp = '^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})$'
+            match_weaker = re.match(regexp, value)
+            if match_weaker:
+                return (QtGui.QValidator.Intermediate, value, pos)
+            else:
+                return (QtGui.QValidator.Invalid, value, pos)
+        else:
+            return (QtGui.QValidator.Acceptable, value, pos)
 
-        return (QtGui.QValidator.Acceptable, value, pos)
+    def fixup(self, s):
+
+        hours, minutes, seconds = s.split(':')
+        s = '{:02d}:{:02d}:{:02d}'.format(int(hours), int(minutes), int(seconds))
+
+        return s
 
 
 class IntervalSettingsDialog(QtWidgets.QDialog):
@@ -63,10 +78,10 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
 
         validator = TimeValidator()
 
-        self._start_line_edit = QtWidgets.QLineEdit('09:00:00')
+        self._start_line_edit = QtWidgets.QLineEdit('00:00:00')
         self._start_line_edit.setValidator(validator)
 
-        self._end_line_edit = QtWidgets.QLineEdit('10:00:00')
+        self._end_line_edit = QtWidgets.QLineEdit('01:00:00')
         self._end_line_edit.setValidator(validator)
 
         self._record_spinbox = QtWidgets.QSpinBox()
