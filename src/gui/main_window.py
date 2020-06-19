@@ -1,4 +1,5 @@
 import glob
+import logging
 import os
 import sys
 
@@ -11,6 +12,7 @@ from inspigtor.gui.dialogs.property_plotter_dialog import PropertyPlotterDialog
 from inspigtor.gui.models.pandas_data_model import PandasDataModel
 from inspigtor.gui.views.pigs_view import PigsView
 from inspigtor.gui.widgets.intervals_widget import IntervalsWidget
+from inspigtor.gui.widgets.logger_widget import QTextEditLogger
 from inspigtor.gui.widgets.multiple_directories_selector import MultipleDirectoriesSelector
 from inspigtor.gui.widgets.statistics_widget import StatisticsWidget
 from inspigtor.readers.picco2_reader import PiCCO2FileReader
@@ -43,7 +45,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         main_layout.addLayout(hlayout)
 
-        main_layout.addWidget(self._data_table)
+        main_layout.addWidget(self._data_table, stretch=2)
+
+        main_layout.addWidget(self._logger.widget)
 
         self._main_frame.setLayout(main_layout)
 
@@ -96,6 +100,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._tabs.addTab(self._intervals_widget, 'Intervals')
         self._tabs.addTab(self._statistics_widget, 'Statistics')
+
+        self._logger = QTextEditLogger(self)
+        self._logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logging.getLogger().addHandler(self._logger)
+        logging.getLogger().setLevel(logging.INFO)
 
         self._progress_label = QtWidgets.QLabel('Progress')
         self._progress_bar = QtWidgets.QProgressBar()
@@ -152,19 +161,25 @@ class MainWindow(QtWidgets.QMainWindow):
 
         filenames = []
 
+        n_loaded_files = 0
+
         # Loop over the pig directories
         for progress, exp_dir in enumerate(experimental_dirs):
 
             exp_dir_basename = os.path.basename(exp_dir)
-            data_files = glob.glob(os.path.join(exp_dir, 'Data*.csv'))
+            data_files = glob.glob(os.path.join(exp_dir, '*.csv'))
 
             # Loop over the Data*csv csv files found in the current oig directory
             for data_file in data_files:
                 data_file_basename = os.path.basename(data_file)
                 filename = os.path.join(exp_dir_basename, data_file_basename)
                 item = QtGui.QStandardItem(filename)
-                # Reads the csv file and bind it to the model's item
-                reader = PiCCO2FileReader(data_file)
+                try:
+                    # Reads the csv file and bind it to the model's item
+                    reader = PiCCO2FileReader(data_file)
+                except IOError as err:
+                    logging.error(str(err))
+                    continue
                 item.setData(reader, 257)
 
                 # The tooltip will be the parameters found in the csv file
@@ -173,12 +188,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
                 filenames.append(filename)
 
+            n_loaded_files += 1
             self.update_progress_bar(progress+1)
 
         # Create a signal/slot connexion for row changed event
         self._pigs_list.selectionModel().currentChanged.connect(self.on_select_pig)
 
         self._pigs_list.setCurrentIndex(self._pigs_list.model().index(0, 0))
+
+        logging.info('Loaded successfully {} files over {}'.format(n_loaded_files, len(experimental_dirs)))
 
     def on_plot_property(self, checked, selected_property):
         """Plot one property of the PiCCO file.
