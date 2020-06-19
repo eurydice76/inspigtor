@@ -1,5 +1,6 @@
 import collections
 import csv
+import logging
 import os
 import sys
 
@@ -63,8 +64,14 @@ class PiCCO2FileReader:
         self._exp_start = datetime.strptime(self._data.iloc[0]['Time'], self._time_fmt)
 
         # The evaluation of intervals starts at t0 - 10 minutes (as asked by experimentalist)
-        t_minus_10_strptime = datetime.strptime(general_info_dict['T0'], self._time_fmt) - datetime.strptime('00:10:00', self._time_fmt)
-        t_minus_10_strptime = datetime.strptime(str(t_minus_10_strptime), self._time_fmt)
+        t_minus_10_strptime = datetime.strptime(general_info_dict['T0'], self._time_fmt) - self._exp_start
+        # If the t0 - 10 is earlier than the beginning of the experiment set t_minus_10_strptime to be the starting time of the experiment
+        if t_minus_10_strptime.days < 0 or t_minus_10_strptime.seconds < 600:
+            logging.warning(
+                'T0 - 10 minutes is earlier than the beginning of the experiment for file {}. Will use its starting time instead.'.format(self._filename))
+            t_minus_10_strptime = self._exp_start
+        else:
+            t_minus_10_strptime = datetime.strptime(str(t_minus_10_strptime), self._time_fmt)
 
         self._t_minus_10_index = 0
 
@@ -136,6 +143,7 @@ class PiCCO2FileReader:
 
             enter_interval = True
             exit_interval = True
+            last_record_index = None
             for t_index in range(self._t_minus_10_index, n_times):
                 delta_t = (datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt) - t0).seconds
                 if delta_t < start:
@@ -149,6 +157,9 @@ class PiCCO2FileReader:
                         if exit_interval:
                             last_record_index = t_index
                             exit_interval = False
+
+            if last_record_index is None:
+                last_record_index = len(self._data.index)
 
             first = True
             starting_index = first_record_index
@@ -191,4 +202,4 @@ class PiCCO2FileReader:
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    print(reader.get_record_intervals([('00:00:00', '00:15:00', 300, 60)]))
+    print(reader.get_record_intervals([('00:00:00', '01:00:00', 300, 60)]))
