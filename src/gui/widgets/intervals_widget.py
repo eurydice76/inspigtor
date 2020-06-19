@@ -1,3 +1,4 @@
+import logging
 import os
 
 import numpy as np
@@ -23,7 +24,8 @@ class IntervalsWidget(QtWidgets.QWidget):
     def build_events(self):
 
         self._compute_button.clicked.connect(self.on_compute_averages)
-        self._intervals_settings_button.clicked.connect(self.on_add_interval_settings)
+        self._clear_intervals_settings_button.clicked.connect(self.on_clear_interval_settings)
+        self._add_intervals_settings_button.clicked.connect(self.on_add_interval_settings)
         self._search_record_intervals_button.clicked.connect(self.on_search_record_intervals)
         self._main_window.pig_selected.connect(self.on_update_record_intervals)
 
@@ -38,7 +40,8 @@ class IntervalsWidget(QtWidgets.QWidget):
         hl11.addWidget(self._times_groupbox)
         hl111 = QtWidgets.QHBoxLayout()
         hl111.addWidget(self._intervals_settings_combo)
-        hl111.addWidget(self._intervals_settings_button)
+        hl111.addWidget(self._clear_intervals_settings_button)
+        hl111.addWidget(self._add_intervals_settings_button)
         self._times_groupbox.setLayout(hl111)
 
         hl12 = QtWidgets.QHBoxLayout()
@@ -69,7 +72,11 @@ class IntervalsWidget(QtWidgets.QWidget):
 
         self._intervals_settings_combo = QtWidgets.QComboBox()
         self._intervals_settings_combo.setFixedWidth(200)
-        self._intervals_settings_button = QtWidgets.QPushButton('Add interval')
+        self._intervals_settings_combo.installEventFilter(self)
+
+        self._clear_intervals_settings_button = QtWidgets.QPushButton('Clear')
+
+        self._add_intervals_settings_button = QtWidgets.QPushButton('Add interval')
 
         self._search_record_intervals_button = QtWidgets.QPushButton('Search record intervals')
 
@@ -80,6 +87,16 @@ class IntervalsWidget(QtWidgets.QWidget):
         model = QtGui.QStandardItemModel()
         self._intervals_list.setModel(model)
         self._intervals_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+
+    def eventFilter(self, source, event):
+
+        if event.type() == QtCore.QEvent.KeyPress:
+            key = event.key()
+            if key == QtCore.Qt.Key_Delete:
+                if source == self._intervals_settings_combo:
+                    self._intervals_settings_combo.removeItem(self._intervals_settings_combo.currentIndex())
+
+        return super(IntervalsWidget, self).eventFilter(source, event)
 
     def init_ui(self):
         """Set the widgets of the main window
@@ -100,6 +117,10 @@ class IntervalsWidget(QtWidgets.QWidget):
             item_text = '{} {} {:d} {:d}'.format(*interval_settings)
 
             self._intervals_settings_combo.addItem(item_text, userData=interval_settings)
+
+    def on_clear_interval_settings(self):
+
+        self._intervals_settings_combo.clear()
 
     def on_compute_averages(self):
         """Computes the average of a given property
@@ -137,15 +158,16 @@ class IntervalsWidget(QtWidgets.QWidget):
                 record_intervals = []
 
             # Compute for each record interval the average and standard deviation of the selected property
-            for interval in record_intervals:
+            for i, interval in enumerate(record_intervals):
                 first_index, last_index = interval
                 values = []
-                for i in range(first_index, last_index):
+                for j in range(first_index, last_index):
                     try:
-                        values.append(float(data[selected_property].iloc[i]))
+                        values.append(float(data[selected_property].iloc[j]))
                     except ValueError:
                         continue
                 if not values:
+                    logging.warning('No values to compute statistics for interval {:d} of file {}'.format(i+1, reader.filename))
                     results['stats'].append(None)
                 else:
                     avg = np.average(values)
