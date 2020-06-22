@@ -130,10 +130,9 @@ class IntervalsWidget(QtWidgets.QWidget):
         if main_window is None:
             return
 
-        model = main_window.pigs_list.model()
+        pigs_model = main_window.pigs_list.model()
 
-        n_pigs = model.rowCount()
-
+        n_pigs = pigs_model.rowCount()
         if n_pigs == 0:
             return
 
@@ -145,39 +144,14 @@ class IntervalsWidget(QtWidgets.QWidget):
         for row in range(n_pigs):
 
             # Fetch the pig's reader
-            model_index = model.index(row, 0)
-            current_item = model.item(row, 0)
-            reader = model.data(model_index, 257)
-            data = reader.data
-
-            results = {'selected_property': selected_property, 'stats': []}
-
-            # Fetch the record interval
-            record_intervals = model.data(model_index, 258)
-            if record_intervals is None:
-                record_intervals = []
-
-            # Compute for each record interval the average and standard deviation of the selected property
-            for i, interval in enumerate(record_intervals):
-                first_index, last_index = interval
-                values = []
-                for j in range(first_index, last_index):
-                    try:
-                        values.append(float(data[selected_property].iloc[j]))
-                    except ValueError:
-                        continue
-                if not values:
-                    logging.warning('No values to compute statistics for interval {:d} of file {}'.format(i+1, reader.filename))
-                    results['stats'].append(None)
-                else:
-                    avg = np.average(values)
-                    std = np.std(values)
-                    results['stats'].append((avg, std))
-
-            current_item.setData(results, 259)
+            model_index = pigs_model.index(row, 0)
+            current_item = pigs_model.item(row, 0)
+            reader = pigs_model.data(model_index, 257)
+            statistics = reader.compute_statistics(selected_property)
+            current_item.setData(statistics, 259)
             main_window.update_progress_bar(row+1)
 
-        dialog = StatsResultsDialog(main_window)
+        dialog = StatsResultsDialog(pigs_model)
         dialog.show()
 
     def on_search_record_intervals(self):
@@ -206,7 +180,8 @@ class IntervalsWidget(QtWidgets.QWidget):
         for row in range(n_pigs):
             model_index = pigs_model.index(row, 0)
             reader = pigs_model.data(model_index, 257)
-            record_intervals = reader.get_record_intervals(interval_settings)
+            reader.set_record_intervals(interval_settings)
+            record_intervals = reader.record_intervals
 
             # Set the record intervals as new data (id 258)
             current_item = pigs_model.item(row, 0)
@@ -232,6 +207,8 @@ class IntervalsWidget(QtWidgets.QWidget):
         self.record_interval_selected.emit(row_min, row_max)
 
     def on_update_record_intervals(self, reader, record_intervals):
+        """Update the intervals list with the newly selected pig
+        """
 
         # Update the record intervals list view
         model = QtGui.QStandardItemModel()

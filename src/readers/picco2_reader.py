@@ -1,10 +1,11 @@
 import collections
 import csv
+from datetime import datetime
 import logging
 import os
 import sys
 
-from datetime import datetime
+import numpy as np
 
 import pandas as pd
 
@@ -63,9 +64,9 @@ class PiCCO2FileReader:
         self._time_fmt = '%H:%M:%S'
         self._exp_start = datetime.strptime(self._data.iloc[0]['Time'], self._time_fmt)
 
-        # The evaluation of intervals starts at t0 - 10 minutes (as asked by experimentalist)
+        # The evaluation of intervals starts at t_zero - 10 minutes (as asked by experimentalist)
         t_minus_10_strptime = datetime.strptime(general_info_dict['T0'], self._time_fmt) - self._exp_start
-        # If the t0 - 10 is earlier than the beginning of the experiment set t_minus_10_strptime to be the starting time of the experiment
+        # If the t_zero - 10 is earlier than the beginning of the experiment set t_minus_10_strptime to be the starting time of the experiment
         if t_minus_10_strptime.days < 0 or t_minus_10_strptime.seconds < 600:
             logging.warning(
                 'T0 - 10 minutes is earlier than the beginning of the experiment for file {}. Will use its starting time instead.'.format(self._filename))
@@ -80,7 +81,7 @@ class PiCCO2FileReader:
         first = True
         for i, t in enumerate(self._data['Time']):
             delta_t = datetime.strptime(t, self._time_fmt) - t_minus_10_strptime
-            # If the difference between the current time and t0 - 10 is positive for the first time, then record the corresponding
+            # If the difference between the current time and t_zero - 10 is positive for the first time, then record the corresponding
             # index as being the reference time
             if delta_t.days >= 0:
                 delta_ts.append(str(delta_t))
@@ -94,10 +95,52 @@ class PiCCO2FileReader:
         if not valid_t_minus_10:
             raise IOError('Invalid value for T0 parameters')
 
-        # Add a column to the original data which show the delta t regarding t0 - 10 minutes
+        # Add a column to the original data which show the delta t regarding t_zero - 10 minutes
         self._data.insert(loc=2, column='delta_t', value=delta_ts)
 
         csv_file.close()
+
+        self._record_intervals = []
+
+        # This dictionary will cache the statistics computed for selected properties to save some time
+        self._statistics = {}
+
+    def compute_statistics(self, selected_property='APs', write_summary=True):
+
+        if selected_property in self._statistics:
+            return self._statistics[selected_property]
+
+        if not self._record_intervals:
+            logging.warning('No record intervals defined yet')
+            return {}
+
+        self._statistics[selected_property] = {'selected_property': selected_property, 'averages': [], 'stds': [], 'coverages': []}
+
+        # Compute for each record interval the average and standard deviation of the selected property
+        for i, interval in enumerate(self._record_intervals):
+            first_index, last_index = interval
+            values = []
+            coverage = 0
+            for j in range(first_index, last_index):
+                try:
+                    values.append(float(self._data[selected_property].iloc[j]))
+                except ValueError:
+                    continue
+                else:
+                    coverage += 1
+            self._statistics[selected_property]['coverages'].append(100.0*coverage/(last_index-first_index))
+            if not values:
+                logging.warning('No values to compute statistics for interval {:d} of file {}'.format(i+1, self._filename))
+                self._statistics[selected_property]['averages'].append(None)
+                self._statistics[selected_property]['stds'].append(None)
+            else:
+                self._statistics[selected_property]['averages'].append(np.average(values))
+                self._statistics[selected_property]['stds'].append(np.std(values))
+
+        if write_summary:
+            self.write_summary(selected_property)
+
+        return self._statistics[selected_property]
 
     @ property
     def data(self):
@@ -119,22 +162,22 @@ class PiCCO2FileReader:
 
         return self._filename
 
-    def get_record_intervals(self, intervals):
+    def set_record_intervals(self, intervals):
         """Computes and returns the record intervals found in the csv data.
 
         Args:
             t_record (int): the record time in seconds
             t_offset (int): the offset time in seconds
-
-        Returns:
-            list: the list of the record intervals found in the csv data.
         """
+
+        # Clear the statistics cache
+        self._statistics = {}
 
         n_times = len(self._data['Time'])
 
-        t0 = datetime.strptime(self._data['Time'].iloc[self._t_minus_10_index], self._time_fmt)
+        t_zero = datetime.strptime(self._data['Time'].iloc[self._t_minus_10_index], self._time_fmt)
 
-        record_intervals = []
+        self._record_intervals = []
 
         for interval in intervals:
             start, end, record, offset = interval
@@ -145,7 +188,7 @@ class PiCCO2FileReader:
             exit_interval = True
             last_record_index = None
             for t_index in range(self._t_minus_10_index, n_times):
-                delta_t = (datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt) - t0).seconds
+                delta_t = (datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt) - t_zero).seconds
                 if delta_t < start:
                     continue
                 else:
@@ -180,11 +223,9 @@ class PiCCO2FileReader:
                     continue
                 # A new offset-record interval is started
                 else:
-                    record_intervals.append((first_record_index, t_index))
+                    self._record_intervals.append((first_record_index, t_index))
                     starting_index = t_index
                     first = True
-
-        return record_intervals
 
     @ property
     def parameters(self):
@@ -198,8 +239,38 @@ class PiCCO2FileReader:
 
         return self._parameters
 
+    @property
+    def record_intervals(self):
+
+        return self._record_intervals
+
+    def write_summary(self, selected_property):
+        """Write the summay about the statistics for a selected property
+        """
+
+        if not selected_property in self._statistics:
+            logging.warning('Statistics for property {} has not yet been computed.'.format(selected_property))
+            return
+
+        summary_file_dirname = os.path.dirname(self._filename)
+        summary_file_basename = os.path.splitext(os.path.basename(self._filename))[0]
+        summary_file = os.path.join(summary_file_dirname, '{}_summary_{}.txt'.format(summary_file_basename, selected_property))
+
+        averages = [v if v is not None else np.nan for v in self._statistics[selected_property]['averages']]
+        stds = [v if v is not None else np.nan for v in self._statistics[selected_property]['stds']]
+        coverages = self._statistics[selected_property]['coverages']
+
+        n_intervals = len(averages)
+
+        with open(summary_file, 'w') as fout:
+            fout.write('interval;average;std;coverage')
+            fout.write('\n')
+            for i in range(n_intervals):
+                fout.write('{:d};{:f};{:f};{:f}\n'.format(i+1, averages[i], stds[i], coverages[i]))
+
 
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    print(reader.get_record_intervals([('00:00:00', '01:00:00', 300, 60)]))
+    reader.set_record_intervals([('00:00:00', '01:00:00', 300, 60)])
+    print(reader.record_intervals)

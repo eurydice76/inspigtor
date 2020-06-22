@@ -9,6 +9,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import inspigtor
 from inspigtor.__pkginfo__ import __version__
 from inspigtor.gui.dialogs.property_plotter_dialog import PropertyPlotterDialog
+from inspigtor.gui.models.pigs_data_model import PigsDataModel
 from inspigtor.gui.models.pandas_data_model import PandasDataModel
 from inspigtor.gui.views.pigs_view import PigsView
 from inspigtor.gui.widgets.intervals_widget import IntervalsWidget
@@ -79,8 +80,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._pigs_list = PigsView()
         self._pigs_list.setDragEnabled(True)
-        model = QtGui.QStandardItemModel()
-        self._pigs_list.setModel(model)
+        pigs_model = PigsDataModel()
+        self._pigs_list.setModel(pigs_model)
         self._pigs_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         self._data_table = QtWidgets.QTableView()
@@ -154,8 +155,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if not experimental_dirs:
             return
 
-        model = QtGui.QStandardItemModel()
-        self._pigs_list.setModel(model)
+        pigs_model = PigsDataModel()
+        self._pigs_list.setModel(pigs_model)
 
         self.init_progress_bar(len(experimental_dirs))
 
@@ -184,7 +185,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
                 # The tooltip will be the parameters found in the csv file
                 item.setData("\n".join([": ".join([k, v]) for k, v in reader.parameters.items()]), QtCore.Qt.ToolTipRole)
-                model.appendRow(item)
+                pigs_model.appendRow(item)
 
                 filenames.append(filename)
 
@@ -194,7 +195,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Create a signal/slot connexion for row changed event
         self._pigs_list.selectionModel().currentChanged.connect(self.on_select_pig)
 
-        self._pigs_list.setCurrentIndex(self._pigs_list.model().index(0, 0))
+        self._pigs_list.setCurrentIndex(pigs_model.index(0, 0))
 
         logging.info('Loaded successfully {} files over {}'.format(n_loaded_files, len(experimental_dirs)))
 

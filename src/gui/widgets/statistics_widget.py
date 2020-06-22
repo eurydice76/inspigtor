@@ -10,10 +10,8 @@ from inspigtor.gui.utils.helper_functions import find_main_window
 
 class StatisticsWidget(QtWidgets.QWidget):
 
-    def __init__(self, main_window=None):
-        super(StatisticsWidget, self).__init__(main_window)
-
-        self._main_window = main_window
+    def __init__(self, main_window, *args, **kwargs):
+        super(StatisticsWidget, self).__init__(*args, **kwargs)
 
         self.init_ui()
 
@@ -70,40 +68,55 @@ class StatisticsWidget(QtWidgets.QWidget):
 
         self.build_events()
 
-    def _get_population_statistics(self, pigs_list_model, population_model):
+    def _get_population_statistics(self, population_model):
+
+        main_window = find_main_window()
+        if main_window is None:
+            return
+
+        pigs_model = main_window.pigs_list.model()
 
         n_pigs = population_model.rowCount()
 
         min_n_intervals = np.inf
         averages = []
+        coverages = []
         for row in range(n_pigs):
             index = population_model.index(row, 0)
             item = population_model.item(index.row(), index.column())
             filename = item.text()
-            items = pigs_list_model.findItems(filename, QtCore.Qt.MatchExactly)
+
+            items = pigs_model.findItems(filename, QtCore.Qt.MatchExactly)
             reader = items[0].data(257)
             stats = items[0].data(259)
             if not stats:
                 raise ValueError('No statistics computed for file {}. Can not continue.'.format(reader.filename))
 
             try:
-                idx = stats['stats'].index(None)
+                idx = stats['averages'].index(None)
             except ValueError:
                 pass
             else:
                 raise ValueError('(At least) interval {:d} has no statistics for file {}. Can not continue.'.format(idx+1, reader.filename))
 
-            min_n_intervals = min(min_n_intervals, len(stats['stats']))
-            averages.append([v[0] for v in stats['stats']])
+            min_n_intervals = min(min_n_intervals, len(stats['averages']))
+            coverages.append(stats['coverages'])
+            averages.append(stats['averages'])
 
+        temp_coverages = np.empty((n_pigs, min_n_intervals))
         temp_averages = np.empty((n_pigs, min_n_intervals))
         for i, avg in enumerate(averages):
+            coverage = coverages[i]
             temp_averages[i, :] = avg[:min_n_intervals]
+            temp_coverages[i, :] = coverage[:min_n_intervals]
 
         averages = np.average(temp_averages, axis=0)
         stds = np.std(temp_averages, axis=0)
 
-        return (averages, stds)
+        average_coverages = np.average(temp_coverages, axis=0)
+        std_coverages = np.std(temp_coverages, axis=0)
+
+        return (averages, stds, average_coverages, std_coverages)
 
     def on_show_statistics(self):
 
@@ -113,21 +126,17 @@ class StatisticsWidget(QtWidgets.QWidget):
         if population1_model.rowCount() == 0 or population2_model.rowCount() == 0:
             return
 
-        main_window = find_main_window()
-        if not main_window:
-            return
-
-        pigs_list = main_window.pigs_list
-        pigs_list_model = pigs_list.model()
-
         try:
-            stats1 = self._get_population_statistics(pigs_list_model, population1_model)
+            stats1 = self._get_population_statistics(population1_model)
         except ValueError as err:
             logging.error(str(err))
             return
 
         try:
-            stats2 = self._get_population_statistics(pigs_list_model, population2_model)
+            stats2 = self._get_population_statistics(population2_model)
         except ValueError as err:
             logging.error(str(err))
             return
+
+        print(stats1)
+        print(stats2)

@@ -8,11 +8,11 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationTool
 
 class StatsResultsDialog(QtWidgets.QDialog):
 
-    def __init__(self, main_window):
+    def __init__(self, pigs_model):
 
         super(StatsResultsDialog, self).__init__()
 
-        self._main_window = main_window
+        self._pigs_model = pigs_model
 
         self.init_ui()
 
@@ -48,12 +48,9 @@ class StatsResultsDialog(QtWidgets.QDialog):
         self._canvas = FigureCanvasQTAgg(self._figure)
         self._toolbar = NavigationToolbar2QT(self._canvas, self)
 
-        # Fetch the model behind pigs list view
-        model = self._main_window.pigs_list.model()
-
         pig_names = []
-        for row in range(model.rowCount()):
-            current_item = model.item(row, 0)
+        for row in range(self._pigs_model.rowCount()):
+            current_item = self._pigs_model.item(row, 0)
             pig_names.append(current_item.data(0))
 
         self._selected_pig_combo = QtWidgets.QComboBox()
@@ -79,20 +76,23 @@ class StatsResultsDialog(QtWidgets.QDialog):
         """
 
         # Fetch the statistics (average and standard deviation) for the selected pig
-        pigs_list = self._main_window._pigs_list
-        model = pigs_list.model()
-        selected_pig_item = model.item(row, 0)
+        selected_pig_item = self._pigs_model.item(row, 0)
         stats = selected_pig_item.data(259)
+
+        if not stats:
+            return
 
         xs = []
         averages = []
         stds = []
-        for i, v in enumerate(stats['stats']):
-            if v is None:
+        for i in range(len(stats['averages'])):
+            avg = stats['averages'][i]
+            std = stats['stds'][i]
+            if avg is None or std is None:
                 continue
             xs.append(i+1)
-            averages.append(v[0])
-            stds.append(v[1])
+            averages.append(avg)
+            stds.append(std)
 
         # If there is already a plot, remove it
         if hasattr(self, '_axes'):
