@@ -1,3 +1,9 @@
+version 0.0.2
+--------------
+* UPDATED refactored GUI
+* ADDED   code for computing statistics
+* ADDED   launching script
+
 version 0.0.1
 --------------
 * ADDED   GUI
