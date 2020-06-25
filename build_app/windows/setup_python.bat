@@ -10,6 +10,8 @@ C:\Users\pellegrini\packages\python-3.7.6-amd64.exe /quiet /uninstall
 
 C:\Users\pellegrini\packages\python-3.7.6-amd64.exe /quiet TargetDir=%target_dir%
 
+set pip_exe=%target_dir%\Scripts\pip.exe
+
 %pip_exe% install numpy
 %pip_exe% install scipy
 %pip_exe% install pandas

@@ -72,7 +72,7 @@ inspigtor release ${VERSION}.\
 ; Insert in the finish page the possibility to view the changelog
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "View CHANGELOG"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
-!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\CHANGELOG"
+!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\CHANGELOG.txt"
 ; Actually insert the finish page to the installer
 !insertmacro MUI_PAGE_FINISH
 
@@ -92,7 +92,7 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
-Section "inspigtor_uninstall ${VERSION}" SEC01
+Section "inspigtor ${VERSION}" SEC01
   SetShellVarContext all
   SetOutPath "$INSTDIR"
   SetOverwrite on
@@ -110,6 +110,7 @@ Section "inspigtor_uninstall ${VERSION}" SEC01
   SetOverwrite on
   CreateShortCut "$DESKTOP\inspigtor.lnk" "$INSTDIR\inspigtor_launcher.bat" "" "${ICONS_DIR}\run.ico" 0
   CreateDirectory "$SMPROGRAMS\IRBA\inspigtor"
+  CreateShortCut "$SMPROGRAMS\IRBA\inspigtor\inspigtor.lnk" "$INSTDIR\inspigtor_launcher.bat" "" "${ICONS_DIR}\run.ico" 0
   WriteIniStr "$INSTDIR\inspigtor.url" "InternetShortcut" "URL" "${WEB_SITE}"
   CreateShortCut "$SMPROGRAMS\IRBA\inspigtor\Website.lnk" "$INSTDIR\inspigtor.url" "" "${ICONS_DIR}\web.ico" 0
   CreateShortCut "$SMPROGRAMS\IRBA\inspigtor\Uninstall.lnk" "$INSTDIR\uninst.exe" "" "${ICONS_DIR}\uninstall.ico" 0
