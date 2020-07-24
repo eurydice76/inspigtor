@@ -11,6 +11,10 @@ import pandas as pd
 
 
 class PiCCO2FileReader:
+    """This class implements the PiCCO device reader.
+
+    This is the base class of inspigtor application.
+    """
 
     def __init__(self, filename):
 
@@ -27,14 +31,14 @@ class PiCCO2FileReader:
         # Read the second line which contains the titles of the general parameters
         line = csv_file.readline().strip()
         line = line[:-1] if line.endswith(';') else line
-        general_info_fields = line.split(';')
+        general_info_fields = [v.strip() for v in line.split(';') if v.strip()]
 
         # Read the third line which contains the values of the general parameters
         line = csv_file.readline().strip()
         line = line[:-1] if line.endswith(';') else line
-        general_info = line.split(';')
+        general_info = [v.strip() for v in line.split(';') if v.strip()]
 
-        # Create a dict outof those parameters
+        # Create a dict out of those parameters
         general_info_dict = collections.OrderedDict(zip(general_info_fields, general_info))
 
         if 'T0' not in general_info_dict:
@@ -43,12 +47,12 @@ class PiCCO2FileReader:
         # Read the fourth line which contains the titles of the pig id parameters
         line = csv_file.readline().strip()
         line = line[:-1] if line.endswith(';') else line
-        pig_id_fields = line.split(';')
+        pig_id_fields = [v.strip() for v in line.split(';') if v.strip()]
 
         # Read the fifth line which contains the values of the pig id parameters
         line = csv_file.readline().strip()
         line = line[:-1] if line.endswith(';') else line
-        pig_id = line.split(';')
+        pig_id = [v.strip() for v in line.split(';') if v.strip()]
 
         # Create a dict outof those parameters
         pig_id_dict = collections.OrderedDict(zip(pig_id_fields, pig_id))
@@ -56,17 +60,19 @@ class PiCCO2FileReader:
         # Concatenate the pig id parameters dict and the general parameters dict
         self._parameters = {**pig_id_dict, **general_info_dict}
 
+        # Read the rest of the file as a csv file
         self._data = pd.read_csv(self._filename, sep=';', skiprows=7, skipfooter=1, engine='python')
 
-        # Some times are not placed in chronological order in the csv file, so sort them before doing anything
+        # For some files, times are not written in chronological order, so sort them before doing anything
         self._data = self._data.sort_values(by=['Time'])
 
         self._time_fmt = '%H:%M:%S'
         self._exp_start = datetime.strptime(self._data.iloc[0]['Time'], self._time_fmt)
 
-        # The evaluation of intervals starts at t_zero - 10 minutes (as asked by experimentalist)
-        t_minus_10_strptime = datetime.strptime(general_info_dict['T0'], self._time_fmt) - self._exp_start
-        # If the t_zero - 10 is earlier than the beginning of the experiment set t_minus_10_strptime to be the starting time of the experiment
+        # The evaluation of intervals starts at t_zero - 10 minutes (as asked by experimentalists)
+        t_minus_10_strptime = datetime.strptime(general_info_dict['T0'], self._time_fmt) - datetime.strptime('00:10:00', self._time_fmt)
+
+        # If the t_zero - 10 is earlier than the beginning of the experiment set t_minus_10_strptime to the starting time of the experiment
         if t_minus_10_strptime.days < 0 or t_minus_10_strptime.seconds < 600:
             logging.warning(
                 'T0 - 10 minutes is earlier than the beginning of the experiment for file {}. Will use its starting time instead.'.format(self._filename))
@@ -79,8 +85,8 @@ class PiCCO2FileReader:
         valid_t_minus_10 = False
         delta_ts = []
         first = True
-        for i, t in enumerate(self._data['Time']):
-            delta_t = datetime.strptime(t, self._time_fmt) - t_minus_10_strptime
+        for i, time in enumerate(self._data['Time']):
+            delta_t = datetime.strptime(time, self._time_fmt) - t_minus_10_strptime
             # If the difference between the current time and t_zero - 10 is positive for the first time, then record the corresponding
             # index as being the reference time
             if delta_t.days >= 0:
@@ -103,42 +109,44 @@ class PiCCO2FileReader:
         self._record_intervals = []
 
         # This dictionary will cache the statistics computed for selected properties to save some time
-        self._statistics = {}
+        self.reset_statistics_cache()
 
-    def compute_statistics(self, selected_property='APs', write_summary=True):
+    def get_averages(self, selected_property='APs'):
+        """Compute the statistics for a given property for the current record intervals.
 
+        For each record interval, computes the average and the standard deviation of the selected property and its coverage.
+
+        Args:
+            selected_property (str): the selected property
+
+        Returns:
+            dict: a dictionary which stores the computed statistics.
+        """
+
+        # If the selected property is cached, just return its current value
         if selected_property in self._statistics:
             return self._statistics[selected_property]
 
+        # Some record intervals must have been set before
         if not self._record_intervals:
             logging.warning('No record intervals defined yet')
             return {}
 
-        self._statistics[selected_property] = {'selected_property': selected_property, 'averages': [], 'stds': [], 'coverages': []}
+        self._statistics[selected_property] = []
 
         # Compute for each record interval the average and standard deviation of the selected property
         for i, interval in enumerate(self._record_intervals):
             first_index, last_index = interval
             values = []
-            coverage = 0
             for j in range(first_index, last_index):
                 try:
                     values.append(float(self._data[selected_property].iloc[j]))
                 except ValueError:
                     continue
-                else:
-                    coverage += 1
-            self._statistics[selected_property]['coverages'].append(100.0*coverage/(last_index-first_index))
             if not values:
                 logging.warning('No values to compute statistics for interval {:d} of file {}'.format(i+1, self._filename))
-                self._statistics[selected_property]['averages'].append(None)
-                self._statistics[selected_property]['stds'].append(None)
             else:
-                self._statistics[selected_property]['averages'].append(np.average(values))
-                self._statistics[selected_property]['stds'].append(np.std(values))
-
-        if write_summary:
-            self.write_summary(selected_property)
+                self._statistics[selected_property].append((i, np.average(values), np.std(values)))
 
         return self._statistics[selected_property]
 
@@ -162,45 +170,93 @@ class PiCCO2FileReader:
 
         return self._filename
 
-    def set_record_intervals(self, intervals):
-        """Computes and returns the record intervals found in the csv data.
+    def get_coverages(self, selected_property='APs'):
+        """Compute the coverages for a given property.
+
+        The coverage of a property is the ratio between the number of valid values over the total number of values for a given property over a given record interval.
 
         Args:
-            t_record (int): the record time in seconds
-            t_offset (int): the offset time in seconds
+            selected_property (str): the selected properrty for which the coverages will be calculated.
+
+        Returns:
+            list of float: the coverages for each record interval
+        """
+
+        if not self._record_intervals:
+            logging.warning('No record intervals defined yet')
+            return []
+
+        coverages = []
+        # Compute for each record interval the average and standard deviation of the selected property
+        for interval in self._record_intervals:
+            first_index, last_index = interval
+            coverage = 0.0
+            for j in range(first_index, last_index):
+                # If the value can be casted to a float, the value is considered to be valid
+                try:
+                    _ = float(self._data[selected_property].iloc[j])
+                except ValueError:
+                    continue
+                else:
+                    coverage += 1.0
+            coverages.append(100.0*coverage/(last_index-first_index))
+
+        return coverages
+
+    def reset_statistics_cache(self):
+        """Reset the statistics cache.
+        """
+
+        self._statistics = {}
+
+    def set_record_intervals(self, intervals):
+        """Set the record intervals.
+
+        Args:
+            intervals (list of 4-tuples): the record time in seconds. List of 4-tuples of the form (start,end,record,offset).
         """
 
         # Clear the statistics cache
-        self._statistics = {}
+        self.reset_statistics_cache()
 
         n_times = len(self._data['Time'])
 
-        t_zero = datetime.strptime(self._data['Time'].iloc[self._t_minus_10_index], self._time_fmt)
+        t_minus_10 = datetime.strptime(self._data['Time'].iloc[self._t_minus_10_index], self._time_fmt)
 
         self._record_intervals = []
 
+        # Loop over each interval
         for interval in intervals:
             start, end, record, offset = interval
+            # Convert strptime to timedelta for further use
             start = (datetime.strptime(start, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
             end = (datetime.strptime(end, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
 
             enter_interval = True
             exit_interval = True
             last_record_index = None
+            # Loop over the times [t0-10,end] for defining the first and last indexes (included) that falls in the running interval
             for t_index in range(self._t_minus_10_index, n_times):
-                delta_t = (datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt) - t_zero).seconds
+                delta_t = (datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt) - t_minus_10).seconds
+                # We have not entered yet in the interval, skip.
                 if delta_t < start:
                     continue
+                # We entered in the interval.
                 else:
+                    # We are in the interval
                     if delta_t < end:
+                        # First time we entered in the interval, record the corresponding index
                         if enter_interval:
                             first_record_index = t_index
                             enter_interval = False
+                    # We left the interval
                     else:
+                        # First time we left the interval, record the corresponding index
                         if exit_interval:
                             last_record_index = t_index
                             exit_interval = False
 
+            # If the last index could not be defined, set it to the last index of the data
             if last_record_index is None:
                 last_record_index = len(self._data.index)
 
@@ -229,7 +285,7 @@ class PiCCO2FileReader:
 
     @ property
     def parameters(self):
-        """Property for the pig's overall parameters.
+        """Returns the global parameters for the pig.
 
         This is the first data block stored in the csv file.
 
@@ -241,13 +297,22 @@ class PiCCO2FileReader:
 
     @property
     def record_intervals(self):
+        """Return the current record intervals (if any).
+
+        Returns:
+            list of 2-tuples: the record inervals.
+        """
 
         return self._record_intervals
 
-    def write_summary(self, selected_property):
+    def write_summary(self, selected_property='APs'):
         """Write the summay about the statistics for a selected property
+
+        Args:
+            selected_property (str): the selected property for which the summary will be written.
         """
 
+        # The selected property must be in the cache
         if not selected_property in self._statistics:
             logging.warning('Statistics for property {} has not yet been computed.'.format(selected_property))
             return
@@ -256,17 +321,16 @@ class PiCCO2FileReader:
         summary_file_basename = os.path.splitext(os.path.basename(self._filename))[0]
         summary_file = os.path.join(summary_file_dirname, '{}_summary_{}.txt'.format(summary_file_basename, selected_property))
 
-        averages = [v if v is not None else np.nan for v in self._statistics[selected_property]['averages']]
-        stds = [v if v is not None else np.nan for v in self._statistics[selected_property]['stds']]
-        coverages = self._statistics[selected_property]['coverages']
+        averages = [np.nan if v is None else v for v in self._statistics[selected_property]['averages']]
+        stds = [np.nan if v is None else v for v in self._statistics[selected_property]['stds']]
 
         n_intervals = len(averages)
 
         with open(summary_file, 'w') as fout:
-            fout.write('interval;average;std;coverage')
+            fout.write('interval;average;std')
             fout.write('\n')
             for i in range(n_intervals):
-                fout.write('{:d};{:f};{:f};{:f}\n'.format(i+1, averages[i], stds[i], coverages[i]))
+                fout.write('{:d};{:f};{:f}\n'.format(i+1, averages[i], stds[i]))
 
 
 if __name__ == '__main__':

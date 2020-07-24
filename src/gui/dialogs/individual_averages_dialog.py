@@ -3,16 +3,22 @@ import numpy as np
 from PyQt5 import QtWidgets
 
 from pylab import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+
+from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
 
 
-class StatsResultsDialog(QtWidgets.QDialog):
+class IndividualAveragesDialog(QtWidgets.QDialog):
+    """This class implements a dialog that will show the averages of a given property for the different pigs.
+    """
 
-    def __init__(self, pigs_model):
+    def __init__(self, pigs_model, parent):
 
-        super(StatsResultsDialog, self).__init__()
+        super(IndividualAveragesDialog, self).__init__(parent)
 
         self._pigs_model = pigs_model
+
+        self._selected_property = self._pigs_model.selected_property
 
         self.init_ui()
 
@@ -26,27 +32,27 @@ class StatsResultsDialog(QtWidgets.QDialog):
         """Build the layout.
         """
 
-        self._main_layout = QtWidgets.QVBoxLayout()
+        main_layout = QtWidgets.QVBoxLayout()
 
-        self._main_layout.addWidget(self._canvas)
-        self._main_layout.addWidget(self._toolbar)
+        main_layout.addWidget(self._canvas)
+        main_layout.addWidget(self._toolbar)
 
-        self._main_layout.addWidget(self._selected_pig_combo)
+        main_layout.addWidget(self._selected_pig_combo)
 
         self.setGeometry(0, 0, 400, 400)
 
-        self.setLayout(self._main_layout)
+        self.setLayout(main_layout)
 
     def build_widgets(self):
         """Build and/or initialize the widgets of the dialog.
         """
 
-        self.setWindowTitle('Statistics')
+        self.setWindowTitle('Individual averages for {} property'.format(self._selected_property))
 
         # Build the matplotlib imsho widget
         self._figure = Figure()
         self._canvas = FigureCanvasQTAgg(self._figure)
-        self._toolbar = NavigationToolbar2QT(self._canvas, self)
+        self._toolbar = NavigationToolbarWithExportButton(self._canvas, self)
 
         pig_names = []
         for row in range(self._pigs_model.rowCount()):
@@ -77,21 +83,18 @@ class StatsResultsDialog(QtWidgets.QDialog):
 
         # Fetch the statistics (average and standard deviation) for the selected pig
         selected_pig_item = self._pigs_model.item(row, 0)
-        stats = selected_pig_item.data(259)
+        reader = selected_pig_item.data(257)
+        individual_averages = reader.get_averages(self._selected_property)
 
-        if not stats:
+        if not individual_averages:
             return
 
         xs = []
         averages = []
         stds = []
-        for i in range(len(stats['averages'])):
-            avg = stats['averages'][i]
-            std = stats['stds'][i]
-            if avg is None or std is None:
-                continue
-            xs.append(i+1)
-            averages.append(avg)
+        for interval, average, std in individual_averages:
+            xs.append(interval+1)
+            averages.append(average)
             stds.append(std)
 
         # If there is already a plot, remove it
@@ -101,8 +104,7 @@ class StatsResultsDialog(QtWidgets.QDialog):
         # Plot the averages and standard deviations
         self._axes = self._figure.add_subplot(111)
         self._axes.set_xlabel('interval')
-        self._axes.set_ylabel(stats['selected_property'])
-        self._axes.set_xlim([-1, len(averages)])
+        self._axes.set_ylabel(self._selected_property)
 
         self._plot = self._axes.errorbar(xs, averages, yerr=stds, fmt='ro')
 

@@ -12,17 +12,20 @@ class DroppableListView(QtWidgets.QListView):
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
 
-    def dragMoveEvent(self, e):
-        e.accept()
+    def dragMoveEvent(self, event):
+        """Event triggered when the dragged item is moved above the target widget.
+        """
 
-    def dragEnterEvent(self, e):
+        event.accept()
+
+    def dragEnterEvent(self, event):
         """Event triggered when the dragged item enter into this widget.
         """
 
-        if e.mimeData().hasFormat('application/x-qabstractitemmodeldatalist'):
-            e.accept()
+        if event.mimeData().hasFormat('application/x-qabstractitemmodeldatalist'):
+            event.accept()
         else:
-            e.ignore()
+            event.ignore()
 
     def dropEvent(self, event):
         """Event triggered when the dragged item is dropped into this widget.

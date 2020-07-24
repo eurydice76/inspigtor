@@ -6,7 +6,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 
 class TimeValidator(QtGui.QValidator):
-    """Implements a Qt validator for 2' hours time format.
+    """Implements a Qt validator for 24 hours time format.
     """
 
     def validate(self, value, pos):
