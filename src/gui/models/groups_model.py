@@ -1,8 +1,9 @@
+"""
+"""
+
 from PyQt5 import QtCore, QtGui
 import collections
 import logging
-
-import numpy as np
 
 import scipy.stats as scistats
 import scikit_posthocs as scikit
@@ -142,5 +143,34 @@ class GroupsModel(QtGui.QStandardItemModel):
 
         for group, averages in averages_per_group.items():
             p_values[group] = scistats.friedmanchisquare(*averages).pvalue
+
+        return p_values
+
+    def evaluate_pairwise_time_effect(self):
+        """Performs a Dunn statistical test to check whether within each group the averages values defined over 
+        intervals belongs to the same distribution.
+
+        Returns:
+            collections.OrderedDict: the p values matrix for each group resulting from the Dunn test
+        """
+
+        averages_per_interval = self._get_averages_per_interval()
+
+        averages_per_group = collections.OrderedDict()
+
+        for groups in averages_per_interval.values():
+
+            for group, averages in groups.items():
+
+                averages_per_group.setdefault(group, []).append(averages)
+
+        p_values = collections.OrderedDict()
+
+        for group, averages in averages_per_group.items():
+            df = scikit.posthoc_dunn(averages)
+            df = df.round(4)
+            df.index = list(averages_per_interval.keys())
+            df.columns = list(averages_per_interval.keys())
+            p_values[group] = df
 
         return p_values

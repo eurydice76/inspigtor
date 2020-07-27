@@ -26,8 +26,10 @@ class GroupEffectWidget(QtWidgets.QWidget):
         main_layout.addWidget(self._kruskal_canvas)
         main_layout.addWidget(self._kruskal_toolbar)
 
-        main_layout.addWidget(self._kruskal_dunn_canvas)
-        main_layout.addWidget(self._kruskal_dunn_toolbar)
+        if self._groups_model.rowCount() >= 3:
+
+            main_layout.addWidget(self._kruskal_dunn_canvas)
+            main_layout.addWidget(self._kruskal_dunn_toolbar)
 
         self.setGeometry(0, 0, 400, 400)
 

@@ -1,6 +1,21 @@
-import numpy as np
+# **************************************************************************
+#
+# MDANSE: Molecular Dynamics Analysis for Neutron Scattering Experiments
+#
+# @file      gui/widgets/coverages_widget.py
+# @brief     Implements class CoveragesWidget
+#
+# @homepage  https://gitlab.com/eurydice38/inspigtor
+# @license   GNU General Public License v3 or higher (see LICENSE)
+# @copyright Institut de Recherche Biomedicale des Armees
+# @authors   Eric Pellegrini
+#
+# **************************************************************************
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+"""This module implements the class CoveragesWidget.
+"""
+
+from PyQt5 import QtWidgets
 
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -9,7 +24,10 @@ from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportBu
 
 
 class CoveragesWidget(QtWidgets.QWidget):
-    """Ths class implements the widgets that stores the coverage plot.
+    """This class implements the widgets that stores the coverage plot.
+
+    A coverage plot is a plot which indicates for each record interval the ratio of float-evaluable values over the total number of values.
+    A ratio of 1 indicates that all values could be successfully casted to a float.
     """
 
     def __init__(self, pigs_model, parent=None):

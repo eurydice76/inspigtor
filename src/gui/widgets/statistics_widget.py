@@ -145,6 +145,12 @@ class StatisticsWidget(QtWidgets.QWidget):
 
         n_pigs = self._pigs_model.rowCount()
         if n_pigs == 0:
+            logging.warning('No pigs loaded yet')
+            return
+
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No groups defined yet')
             return
 
         dialog = GroupStatisticsDialog(self._pigs_model, self._groups_list.model(), self)
