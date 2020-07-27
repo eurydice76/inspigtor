@@ -23,6 +23,9 @@ copyright = '2020, Eric Pellegrini'
 author = 'Eric Pellegrini'
 
 
+# See https://stackoverflow.com/questions/56336234/build-fail-sphinx-error-contents-rst-not-found for info
+master_doc = 'index'
+
 version = pkg_resources.get_distribution('inspigtor').version
 
 # The full version, including alpha/beta/rc tags.
