@@ -1,17 +1,3 @@
-# **************************************************************************
-#
-# MDANSE: Molecular Dynamics Analysis for Neutron Scattering Experiments
-#
-# @file      gui/widgets/coverages_widget.py
-# @brief     Implements class CoveragesWidget
-#
-# @homepage  https://gitlab.com/eurydice38/inspigtor
-# @license   GNU General Public License v3 or higher (see LICENSE)
-# @copyright Institut de Recherche Biomedicale des Armees
-# @authors   Eric Pellegrini
-#
-# **************************************************************************
-
 """This module implements the class CoveragesWidget.
 """
 

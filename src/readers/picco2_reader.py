@@ -1,5 +1,4 @@
 import collections
-import csv
 from datetime import datetime
 import logging
 import os
@@ -11,9 +10,13 @@ import pandas as pd
 
 
 class PiCCO2FileReader:
-    """This class implements the PiCCO device reader.
+    """This class implements the PiCCO2 device reader.
 
-    This is the base class of inspigtor application.
+    This is the base class of inspigtor application. It reads and parses a PiCCO2 file and computes statistics on 
+    the properties stored in the file (columns). To be read properly, the file must contain a cell with the starting 
+    time and ending time of the experiment. The T0 time will be used to define a T0 - 10 minutes time starting from 
+    which records intervals will be computed. Those record intervals are those interval on which the average and std
+    of a given property are computed. The Tfinal time will be used to compute pre-mortem statistics. 
     """
 
     def __init__(self, filename):
