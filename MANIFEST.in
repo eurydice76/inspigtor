@@ -1,6 +1,6 @@
 graft src/inspigtor
 graft docs
-prune docs/_build
+prune docs/build
 
 graft tests
 
