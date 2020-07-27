@@ -1,0 +1,13 @@
+graft src/inspigtor
+graft docs
+prune docs/_build
+
+graft tests
+
+include README.md
+include CHANGELOG.md
+include CONTRIBUTORS.md LICENSE
+
+include src/inspigtor/icons/*
+
+global-exclude __pycache__
