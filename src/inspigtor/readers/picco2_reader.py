@@ -263,28 +263,21 @@ class PiCCO2FileReader:
             if last_record_index is None:
                 last_record_index = len(self._data.index)
 
-            first = True
             starting_index = first_record_index
+            delta_ts = []
             for t_index in range(first_record_index, last_record_index):
                 t0 = datetime.strptime(self._data['Time'].iloc[starting_index], self._time_fmt)
                 t1 = datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt)
                 delta_t = (t1 - t0).seconds
+                delta_ts.append((t_index, delta_t))
 
-                # Case of a time within the offset, skip.
-                if delta_t < offset:
-                    continue
-                # Case of a time within the record interval, save the first time of the record interval
-                elif (delta_t >= offset) and (delta_t < offset + record):
-                    if first:
-                        first_record_index = t_index
-                        first = False
-
-                    continue
-                # A new offset-record interval is started
-                else:
-                    self._record_intervals.append((first_record_index, t_index))
+                if delta_t > record + offset:
+                    for r_index, delta_t in delta_ts:
+                        if delta_t > record:
+                            self._record_intervals.append((starting_index, r_index))
+                            break
                     starting_index = t_index
-                    first = True
+                    delta_ts = []
 
     @ property
     def parameters(self):
@@ -339,5 +332,5 @@ class PiCCO2FileReader:
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    reader.set_record_intervals([('00:00:00', '01:00:00', 300, 60)])
+    reader.set_record_intervals([('00:00:00', '01:00:00', 120, 30)])
     print(reader.record_intervals)
