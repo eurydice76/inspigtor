@@ -25,4 +25,4 @@ setup(name="inspigtor",
       include_package_data=True,
       package_dir={'': 'src'},
       platforms=['Unix', 'Windows'],
-      entry_points={'gui_scripts': ['inspigtor = inspigtor.scripts.inspigtor:main']})
+      entry_points={'gui_scripts': ['inspigtor = inspigtor.scripts.run_inspigtor:main']})
