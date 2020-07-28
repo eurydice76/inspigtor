@@ -30,7 +30,7 @@ class IndividualsModel(QtGui.QStandardItemModel):
             individual_averages = reader.get_averages(self._pigs_model.selected_property)
             if not individual_averages:
                 logging.warning('No averages computed for file {}'.format(reader.filename))
-                continue
+                return None
 
             intervals = [interval for interval, _, _ in individual_averages]
             averages = [average for _, average, _ in individual_averages]

@@ -87,14 +87,17 @@ class GroupAveragesDialog(QtWidgets.QDialog):
         if not self._groups_model.findItems(group, QtCore.Qt.MatchExactly):
             return
 
-        individuals_model = self._groups_model.get_group(group)
-        if individuals_model is not None and individuals_model.rowCount() == 0:
+        individuals_model = self._groups_model.data(self._groups_model.index(row, 0), 257)
+        if individuals_model is None or individuals_model.rowCount() == 0:
             return
 
         temp = individuals_model.get_averages()
         if temp is None:
             return
         averages, stds = temp
+
+        print(averages)
+        print(stds)
 
         # If there is already a plot, remove it
         if hasattr(self, '_axes'):
