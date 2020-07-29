@@ -56,6 +56,8 @@ class GroupEffectWidget(QtWidgets.QWidget):
         """
 
         p_values = self._groups_model.evaluate_global_group_effect()
+        if not p_values:
+            return
 
         self._kruskal_axes.clear()
         self._kruskal_axes.set_xlabel('interval')

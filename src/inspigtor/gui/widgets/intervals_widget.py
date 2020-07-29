@@ -15,6 +15,13 @@ class IntervalsWidget(QtWidgets.QWidget):
     update_properties = QtCore.pyqtSignal(list)
 
     def __init__(self, pigs_model, parent=None):
+        """Constructor
+
+        Args:
+            pigs_model (inspigtor.gui.models.pigs_data_model.PigsDataModel): the underlying model for the registered pigs
+            parent (PyQt5.QtWidgets.QWidget): the parent widget
+        """
+
         super(IntervalsWidget, self).__init__(parent)
 
         self._pigs_model = pigs_model
@@ -174,13 +181,19 @@ class IntervalsWidget(QtWidgets.QWidget):
         self._intervals_list.setModel(model)
         self._intervals_list.selectionModel().currentChanged.connect(self.on_select_interval)
 
+        record_times = reader.record_times
         for i, interval in enumerate(record_intervals):
             item = QtGui.QStandardItem('interval {}'.format(i+1))
             item.setData(interval)
+            item.setData(" - ".join(record_times[i]), QtCore.Qt.ToolTipRole)
             model.appendRow(item)
 
         self.update_properties.emit(list(reader.data.columns))
 
         coverages = reader.get_coverages(self._pigs_model.selected_property)
+
+        t0_interval_index = reader.t0_interval_index
+        index = model.index(t0_interval_index-1, 0)
+        model.setData(index, QtGui.QBrush(QtCore.Qt.red), QtCore.Qt.ForegroundRole)
 
         self._coverages_widget.update_coverage_plot(coverages)

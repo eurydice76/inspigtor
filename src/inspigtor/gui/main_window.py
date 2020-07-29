@@ -173,6 +173,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         """
 
+        # Update the pigs model with the newly selected property
         self._pigs_list.model().selected_property = selected_property
 
     def on_load_experiment_data(self):

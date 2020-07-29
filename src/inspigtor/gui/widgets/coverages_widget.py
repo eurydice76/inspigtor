@@ -64,9 +64,12 @@ class CoveragesWidget(QtWidgets.QWidget):
             coverages (list): the coverages values to plot
         """
 
-        self._axes.clear()
+        n_intervals = len(coverages)
 
-        self._axes.plot(range(1, len(coverages)+1), coverages)
+        self._axes.clear()
+        self._axes.plot(range(1, n_intervals+1), coverages)
+        self._axes.set_xticks(range(1, n_intervals+1))
+        self._axes.set_xticklabels(range(1, n_intervals+1))
         self._axes.set_xlabel('interval')
         self._axes.set_ylabel('coverage')
 

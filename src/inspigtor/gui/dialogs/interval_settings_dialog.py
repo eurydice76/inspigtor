@@ -28,28 +28,51 @@ class TimeValidator(QtGui.QValidator):
         else:
             return (QtGui.QValidator.Acceptable, value, pos)
 
-    def fixup(self, s):
+    def fixup(self, input_string):
+        """Fix the iput string to match the required format for the validator.
 
-        hours, minutes, seconds = s.split(':')
-        s = '{:02d}:{:02d}:{:02d}'.format(int(hours), int(minutes), int(seconds))
+        Args:
+            input_string (str): the input string
 
-        return s
+        Returns:
+            str: a fixed version of the input string
+        """
+
+        hours, minutes, seconds = input_string.split(':')
+        output_string = '{:02d}:{:02d}:{:02d}'.format(int(hours), int(minutes), int(seconds))
+
+        return output_string
 
 
 class IntervalSettingsDialog(QtWidgets.QDialog):
+    """This class implements the dialog used to set up a new interval.
+
+    An interval is the entity used to define record intervals from a given PiCCO2 reader.
+    It is stored internally as a 4-tuples of the form (start,end,record,offset) where:
+        - start is the starting time of the interval starting from t0 - 10 minutes time origin
+        - end is the ending time of the interval starting from t0 - 10 minutes time origin
+        - record is the length in seconds of the records interval that should be search in the full interval
+        - offset is the length in seconds of the offset interval where the records will not be taken into account 
+    """
 
     def __init__(self, *args, **kwargs):
+        """Constructor
+        """
 
         super(IntervalSettingsDialog, self).__init__(*args, **kwargs)
 
         self.init_ui()
 
     def build_events(self):
+        """Build the signal/slots.
+        """
 
         self._button_box.accepted.connect(self.accept)
         self._button_box.rejected.connect(self.reject)
 
     def build_layout(self):
+        """Build the layout.
+        """
 
         main_layout = QtWidgets.QVBoxLayout()
         main_layout.addWidget(self._form_group_box)
@@ -68,6 +91,8 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
         self.setLayout(main_layout)
 
     def build_widgets(self):
+        """Build the widgets.
+        """
 
         self._form_group_box = QtWidgets.QGroupBox("Interval settings (starting from t-10)")
 
@@ -81,7 +106,7 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
         self._start_line_edit = QtWidgets.QLineEdit('00:00:00')
         self._start_line_edit.setValidator(validator)
 
-        self._end_line_edit = QtWidgets.QLineEdit('01:00:00')
+        self._end_line_edit = QtWidgets.QLineEdit('02:00:00')
         self._end_line_edit.setValidator(validator)
 
         self._record_spinbox = QtWidgets.QSpinBox()
@@ -97,6 +122,11 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
         self._button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
 
     def value(self):
+        """Return the interval stored in the dialog.
+
+        Returns:
+            4-tuple: the interval stored in the form (starting, ending, record, offset)
+        """
 
         start = self._start_line_edit.text()
         end = self._end_line_edit.text()
@@ -106,7 +136,7 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
         return (start, end, record, offset)
 
     def init_ui(self):
-        """
+        """Initializes the ui.
         """
 
         self.build_widgets()

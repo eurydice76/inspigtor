@@ -14,6 +14,11 @@ class GroupsModel(QtGui.QStandardItemModel):
     """
 
     def __init__(self, pigs_model):
+        """Constructor
+
+        Args:
+            pigs_model ()
+        """
 
         super(GroupsModel, self).__init__()
 
@@ -44,14 +49,14 @@ class GroupsModel(QtGui.QStandardItemModel):
                 individual_averages = reader.get_averages(self._pigs_model.selected_property)
                 if not individual_averages:
                     logging.warning('No averages computed for file {}'.format(reader.filename))
-                    return collections.OrderedDict()
+                    return None
 
                 intervals = [interval for interval, _, _ in individual_averages]
                 averages = [average for _, average, _ in individual_averages]
 
                 if previous_intervals is not None and intervals != previous_intervals:
-                    logging.warning('Individuals of the group do not have matching intervals')
-                    return collections.OrderedDict()
+                    logging.warning('Individuals of the group {} do not have matching intervals'.format(group))
+                    return None
 
                 for interval, average in zip(intervals, averages):
                     averages_per_interval.setdefault(interval, collections.OrderedDict()).setdefault(group, []).append(average)
@@ -75,6 +80,8 @@ class GroupsModel(QtGui.QStandardItemModel):
             return []
 
         averages_per_interval = self._get_averages_per_interval()
+        if not averages_per_interval:
+            return None
 
         p_values = []
         for groups in averages_per_interval.values():
@@ -102,6 +109,8 @@ class GroupsModel(QtGui.QStandardItemModel):
             return []
 
         averages_per_interval = self._get_averages_per_interval()
+        if not averages_per_interval:
+            return None
 
         group_names = [self.item(i).data(QtCore.Qt.DisplayRole) for i in range(self.rowCount())]
 
@@ -130,12 +139,14 @@ class GroupsModel(QtGui.QStandardItemModel):
         """
 
         averages_per_interval = self._get_averages_per_interval()
+        if not averages_per_interval:
+            return None
 
         averages_per_group = collections.OrderedDict()
 
-        for groups in averages_per_interval.values():
+        for groups_dict in averages_per_interval.values():
 
-            for group, averages in groups.items():
+            for group, averages in groups_dict.items():
 
                 averages_per_group.setdefault(group, []).append(averages)
 
@@ -169,8 +180,7 @@ class GroupsModel(QtGui.QStandardItemModel):
         for group, averages in averages_per_group.items():
             df = scikit.posthoc_dunn(averages)
             df = df.round(4)
-            df.index = list(averages_per_interval.keys())
-            df.columns = list(averages_per_interval.keys())
+
             p_values[group] = df
 
         return p_values

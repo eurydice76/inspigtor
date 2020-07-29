@@ -1,5 +1,3 @@
-import logging
-
 from PyQt5 import QtCore, QtWidgets
 
 from pylab import Figure
@@ -95,9 +93,6 @@ class GroupAveragesDialog(QtWidgets.QDialog):
         if temp is None:
             return
         averages, stds = temp
-
-        print(averages)
-        print(stds)
 
         # If there is already a plot, remove it
         if hasattr(self, '_axes'):
