@@ -84,15 +84,14 @@ class IndividualAveragesDialog(QtWidgets.QDialog):
         # Fetch the statistics (average and standard deviation) for the selected pig
         selected_pig_item = self._pigs_model.item(row, 0)
         reader = selected_pig_item.data(257)
-        individual_averages = reader.get_averages(self._selected_property)
-
+        individual_averages = reader.get_descriptive_statistics(self._selected_property)
         if not individual_averages:
             return
 
         xs = []
         averages = []
         stds = []
-        for interval, average, std in individual_averages:
+        for interval, average, std in zip(individual_averages['intervals'], individual_averages['averages'], individual_averages['stddevs']):
             xs.append(interval+1)
             averages.append(average)
             stds.append(std)

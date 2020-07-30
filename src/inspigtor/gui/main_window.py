@@ -1,13 +1,12 @@
-import glob
 import logging
 import os
 import sys
 
-from PyQt5.QtCore import Qt
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 import inspigtor
 from inspigtor.__pkginfo__ import __version__
+from inspigtor.gui.dialogs.individual_averages_dialog import IndividualAveragesDialog
 from inspigtor.gui.dialogs.property_plotter_dialog import PropertyPlotterDialog
 from inspigtor.gui.models.pigs_data_model import PigsDataModel
 from inspigtor.gui.models.pandas_data_model import PandasDataModel
@@ -25,8 +24,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
     pig_selected = QtCore.pyqtSignal(PiCCO2FileReader, list)
 
+    add_new_group = QtCore.pyqtSignal(str)
+
+    display_group_averages = QtCore.pyqtSignal()
+
+    display_group_time_effect_statistics = QtCore.pyqtSignal()
+
+    export_group_statistics = QtCore.pyqtSignal()
+
     def __init__(self, parent=None):
-        super(MainWindow, self).__init__(parent)
+        """Constructor.
+        """
+
+        super(MainWindow, self).__init__()
 
         self.init_ui()
 
@@ -40,6 +50,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._intervals_widget.update_properties.connect(self.on_update_properties)
         self.pig_selected.connect(self._intervals_widget.on_update_record_intervals)
         self._selected_property_combo.currentTextChanged.connect(self.on_change_selected_property)
+        self._show_individual_averages_button.clicked.connect(self.on_show_individual_averages)
 
     def build_layout(self):
         """Build the layout.
@@ -57,6 +68,8 @@ class MainWindow(QtWidgets.QMainWindow):
         selected_property_layout.addWidget(self._selected_property_combo)
         vlayout.addLayout(selected_property_layout)
 
+        vlayout.addWidget(self._show_individual_averages_button)
+
         hlayout.addLayout(vlayout)
 
         hlayout.addWidget(self._tabs)
@@ -73,21 +86,50 @@ class MainWindow(QtWidgets.QMainWindow):
         """Build the menu.
         """
 
-        file_action = QtWidgets.QAction(QtGui.QIcon('file.png'), '&File', self)
-        file_action.setShortcut('Ctrl+O')
-        file_action.setStatusTip('Open experimental directories')
-        file_action.triggered.connect(self.on_load_experiment_data)
-
-        exit_action = QtWidgets.QAction(QtGui.QIcon('exit.png'), '&Exit', self)
-        exit_action.setShortcut('Ctrl+Q')
-        exit_action.setStatusTip('Exit application')
-        exit_action.triggered.connect(self.on_quit_application)
-
         menubar = self.menuBar()
+
         file_menu = menubar.addMenu('&File')
 
+        file_action = QtWidgets.QAction('&File', self)
+        file_action.setShortcut('Ctrl+O')
+        file_action.setStatusTip('Open PiCCO2 files')
+        file_action.triggered.connect(self.on_load_experiment_data)
         file_menu.addAction(file_action)
+
+        exit_action = QtWidgets.QAction('&Exit', self)
+        exit_action.setShortcut('Ctrl+Q')
+        exit_action.setStatusTip('Exit inspigtor')
+        exit_action.triggered.connect(self.on_quit_application)
         file_menu.addAction(exit_action)
+
+        group_menu = menubar.addMenu('&Groups')
+        add_group_action = QtWidgets.QAction('&Add group', self)
+        add_group_action.setShortcut('Ctrl+A')
+        add_group_action.setStatusTip('Add new group')
+        add_group_action.triggered.connect(self.on_add_new_group)
+        group_menu.addAction(add_group_action)
+
+        group_menu.addSeparator()
+
+        display_group_averages_action = QtWidgets.QAction('&Display averages', self)
+        display_group_averages_action.setShortcut('Ctrl+D')
+        display_group_averages_action.setStatusTip('Display averages and std for each group')
+        display_group_averages_action.triggered.connect(self.on_display_group_averages)
+        group_menu.addAction(display_group_averages_action)
+
+        export_group_statistics = QtWidgets.QAction('&Export statistics', self)
+        export_group_statistics.setShortcut('Ctrl+E')
+        export_group_statistics.setStatusTip('Export statistics (average, std, quartile ...)')
+        export_group_statistics.triggered.connect(self.on_export_group_statistics)
+        group_menu.addAction(export_group_statistics)
+
+        group_menu.addSeparator()
+
+        display_group_time_effect_action = QtWidgets.QAction('D&isplay group/time effect statistics', self)
+        display_group_time_effect_action.setShortcut('Ctrl+G')
+        display_group_time_effect_action.setStatusTip('Display group/time effect statistics')
+        display_group_time_effect_action.triggered.connect(self.on_display_group_time_effect_statistics)
+        group_menu.addAction(display_group_time_effect_action)
 
     def build_widgets(self):
         """Build the widgets.
@@ -106,6 +148,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._selected_property_label = QtWidgets.QLabel('Selected property')
 
         self._selected_property_combo = QtWidgets.QComboBox()
+
+        self._show_individual_averages_button = QtWidgets.QPushButton('Show individual averages')
 
         self._data_table = CopyPastableTableView()
         self._data_table.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
@@ -165,6 +209,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.build_events()
 
+    def on_add_new_group(self):
+        """Event fired when the user clicks on 'Add group' menu button.
+        """
+
+        group, ok = QtWidgets.QInputDialog.getText(self, 'Enter group name', 'Group name', QtWidgets.QLineEdit.Normal, 'group')
+
+        if ok and group:
+            self.add_new_group.emit(group)
+
     def on_change_selected_property(self, selected_property):
         """Event fired when the user change the property to compute the statistics with.
 
@@ -175,6 +228,24 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Update the pigs model with the newly selected property
         self._pigs_list.model().selected_property = selected_property
+
+    def on_display_group_averages(self):
+        """Event fired when the user clicks on 'Display group averages plot' menu button.
+        """
+
+        self.display_group_averages.emit()
+
+    def on_display_group_time_effect_statistics(self):
+        """Event fire when the user clicks on 'Display group/time effect statistics' menu button.
+        """
+
+        self.display_group_time_effect_statistics.emit()
+
+    def on_export_group_statistics(self):
+        """Event fired when the user clicks on the 'Export statistics' menu button.
+        """
+
+        self.export_group_statistics.emit()
 
     def on_load_experiment_data(self):
         """Event fired when the user loads expriment data by clicking on File -> Open or double clicking on the data list view when it is empty.
@@ -328,6 +399,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
         menu.addMenu(plot_menu)
         menu.exec_(QtGui.QCursor.pos())
+
+    def on_show_individual_averages(self):
+        """Event fired when the menu button for the average of a selected property over a group is clicked.
+        """
+
+        n_pigs = self._pigs_model.rowCount()
+        if n_pigs == 0:
+            return
+
+        dialog = IndividualAveragesDialog(self._pigs_model, self)
+        dialog.show()
 
     def on_update_properties(self, properties):
         """Event fired when a pig is loaded.

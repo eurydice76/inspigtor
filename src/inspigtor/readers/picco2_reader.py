@@ -6,6 +6,8 @@ import sys
 
 import numpy as np
 
+import scipy.stats as stats
+
 import pandas as pd
 
 
@@ -139,7 +141,7 @@ class PiCCO2FileReader:
 
         return self._filename
 
-    def get_averages(self, selected_property='APs'):
+    def get_descriptive_statistics(self, selected_property='APs'):
         """Compute the statistics for a given property for the current record intervals.
 
         For each record interval, computes the average and the standard deviation of the selected property.
@@ -160,7 +162,7 @@ class PiCCO2FileReader:
             logging.error('No record intervals defined yet')
             return None
 
-        self._statistics[selected_property] = []
+        self._statistics[selected_property] = {}
 
         # Compute for each record interval the average and standard deviation of the selected property
         for i, interval in enumerate(self._record_intervals):
@@ -175,7 +177,14 @@ class PiCCO2FileReader:
                 logging.error('The interval {:d} of file {} does not contain any number'.format(i+1, self._filename))
                 return None
             else:
-                self._statistics[selected_property].append((i, np.average(values), np.std(values)))
+                self._statistics[selected_property].setdefault('intervals', []).append(i+1)
+                self._statistics[selected_property].setdefault('averages', []).append(np.average(values))
+                self._statistics[selected_property].setdefault('stddevs', []).append(np.std(values))
+                self._statistics[selected_property].setdefault('medians', []).append(np.median(values))
+                self._statistics[selected_property].setdefault('1st quantiles', []).append(np.quantile(values, 0.25))
+                self._statistics[selected_property].setdefault('3rd quantiles', []).append(np.quantile(values, 0.75))
+                self._statistics[selected_property].setdefault('skewnesses', []).append(stats.skew(values))
+                self._statistics[selected_property].setdefault('kurtosis', []).append(stats.kurtosis(values))
 
         return self._statistics[selected_property]
 

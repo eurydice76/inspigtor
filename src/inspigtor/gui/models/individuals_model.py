@@ -38,12 +38,12 @@ class IndividualsModel(QtGui.QStandardItemModel):
 
             pig_item = self._pigs_model.findItems(pig, QtCore.Qt.MatchExactly)[0]
             reader = pig_item.data(257)
-            individual_averages = reader.get_averages(self._pigs_model.selected_property)
+            individual_averages = reader.get_descriptive_statistics(self._pigs_model.selected_property)
             if not individual_averages:
                 return None
 
-            intervals = [interval for interval, _, _ in individual_averages]
-            averages = [average for _, average, _ in individual_averages]
+            intervals = individual_averages['intervals']
+            averages = individual_averages['averages']
 
             all_individual_averages.append(averages)
             if previous_intervals is not None and intervals != previous_intervals:

@@ -1,12 +1,16 @@
 """
 """
 
+import numpy as np
+
 from PyQt5 import QtCore, QtGui
 import collections
 import logging
 
-import scipy.stats as scistats
-import scikit_posthocs as scikit
+import scipy.stats as stats
+import scikit_posthocs as sk
+
+import xlsxwriter
 
 
 class GroupsModel(QtGui.QStandardItemModel):
@@ -25,8 +29,8 @@ class GroupsModel(QtGui.QStandardItemModel):
         self._pigs_model = pigs_model
 
     def _get_averages_per_interval(self):
-        """Returns a nested dictionary where the key are the interval number and the value 
-        a collections.OrderedDict whose key/values are respectively the group and the average of each individual 
+        """Returns a nested dictionary where the key are the interval number and the value
+        a collections.OrderedDict whose key/values are respectively the group and the average of each individual
         of the group for a given property.
 
         Returns:
@@ -46,18 +50,18 @@ class GroupsModel(QtGui.QStandardItemModel):
 
                 pig_item = self._pigs_model.findItems(pig, QtCore.Qt.MatchExactly)[0]
                 reader = pig_item.data(257)
-                individual_averages = reader.get_averages(self._pigs_model.selected_property)
+                individual_averages = reader.get_descriptive_statistics(self._pigs_model.selected_property)
                 if not individual_averages:
                     logging.warning('No averages computed for file {}'.format(reader.filename))
                     return None
 
-                intervals = [interval for interval, _, _ in individual_averages]
-                averages = [average for _, average, _ in individual_averages]
+                intervals = individual_averages['intervals']
 
                 if previous_intervals is not None and intervals != previous_intervals:
                     logging.warning('Individuals of the group {} do not have matching intervals'.format(group))
                     return None
 
+                averages = individual_averages['averages']
                 for interval, average in zip(intervals, averages):
                     averages_per_interval.setdefault(interval, collections.OrderedDict()).setdefault(group, []).append(average)
 
@@ -67,7 +71,7 @@ class GroupsModel(QtGui.QStandardItemModel):
 
     def evaluate_global_group_effect(self):
         """Performs a statistical test to check whether the groups belongs to the same distribution.
-        If there are only two groups, a Mann-Whitney test is performed otherwise a Kruskal-Wallis test 
+        If there are only two groups, a Mann-Whitney test is performed otherwise a Kruskal-Wallis test
         is performed.
 
         Returns:
@@ -87,9 +91,9 @@ class GroupsModel(QtGui.QStandardItemModel):
         for groups in averages_per_interval.values():
 
             if n_groups == 2:
-                p_value = scistats.mannwhitneyu(*groups.values(), alternative='two-sided').pvalue
+                p_value = stats.mannwhitneyu(*groups.values(), alternative='two-sided').pvalue
             else:
-                p_value = scistats.kruskal(*groups.values()).pvalue
+                p_value = stats.kruskal(*groups.values()).pvalue
 
             p_values.append(p_value)
 
@@ -116,7 +120,7 @@ class GroupsModel(QtGui.QStandardItemModel):
 
         p_values_per_interval = []
         for groups in averages_per_interval.values():
-            p_values_per_interval.append(scikit.posthoc_dunn(list(groups.values())))
+            p_values_per_interval.append(sk.posthoc_dunn(list(groups.values())))
 
         pairwise_p_values = collections.OrderedDict()
         for p_values in p_values_per_interval:
@@ -131,7 +135,7 @@ class GroupsModel(QtGui.QStandardItemModel):
 
     def evaluate_global_time_effect(self):
         """Performs a Friedman statistical test to check whether the groups belongs to the same distribution.
-        If there are only two groups, a Mann-Whitney test is performed otherwise a Kruskal-Wallis test 
+        If there are only two groups, a Mann-Whitney test is performed otherwise a Kruskal-Wallis test
         is performed.
 
         Returns:
@@ -153,12 +157,12 @@ class GroupsModel(QtGui.QStandardItemModel):
         p_values = collections.OrderedDict()
 
         for group, averages in averages_per_group.items():
-            p_values[group] = scistats.friedmanchisquare(*averages).pvalue
+            p_values[group] = stats.friedmanchisquare(*averages).pvalue
 
         return p_values
 
     def evaluate_pairwise_time_effect(self):
-        """Performs a Dunn statistical test to check whether within each group the averages values defined over 
+        """Performs a Dunn statistical test to check whether within each group the averages values defined over
         intervals belongs to the same distribution.
 
         Returns:
@@ -178,9 +182,51 @@ class GroupsModel(QtGui.QStandardItemModel):
         p_values = collections.OrderedDict()
 
         for group, averages in averages_per_group.items():
-            df = scikit.posthoc_dunn(averages)
+            df = sk.posthoc_dunn(averages)
             df = df.round(4)
 
             p_values[group] = df
 
         return p_values
+
+    def export_statistics(self, filename):
+        """Export basic statistics (average, median, std, quartile ...) for each group and interval to an excel file.
+
+        Args:
+            filename (str): the output excel filename
+        """
+
+        averages_per_interval = self._get_averages_per_interval()
+        if not averages_per_interval:
+            return None
+
+        workbook = xlsxwriter.Workbook(filename)
+        for i in range(self.rowCount()):
+            item = self.item(i)
+            group_name = item.data(QtCore.Qt.DisplayRole)
+            worksheet = workbook.add_worksheet(group_name)
+            worksheet.write('K1', 'Selected property')
+            worksheet.write('K2', self._pigs_model.selected_property)
+            worksheet.write('A1', 'Interval')
+            worksheet.write('B1', 'Average')
+            worksheet.write('C1', 'Std Dev')
+            worksheet.write('D1', 'Median')
+            worksheet.write('E1', '1st quartile')
+            worksheet.write('F1', '3rd quartile')
+            worksheet.write('G1', 'skewness')
+            worksheet.write('H1', 'kurtosis')
+
+   for i, (interval, groups) in enumerate(averages_per_interval.items()):
+
+        for group_name, averages in groups.items():
+            worksheet = workbook.get_worksheet_by_name(group_name)
+            worksheet.write('A{}'.format(i+2), interval)
+            worksheet.write('B{}'.format(i+2), np.average(averages))
+            worksheet.write('C{}'.format(i+2), np.std(averages))
+            worksheet.write('D{}'.format(i+2), np.median(averages))
+            worksheet.write('E{}'.format(i+2), np.quantile(averages, 0.25))
+            worksheet.write('F{}'.format(i+2), np.quantile(averages, 0.75))
+            worksheet.write('G{}'.format(i+2), stats.skew(averages))
+            worksheet.write('H{}'.format(i+2), stats.kurtosis(averages))
+
+    workbook.close()
