@@ -167,24 +167,25 @@ class PiCCO2FileReader:
         # Compute for each record interval the average and standard deviation of the selected property
         for i, interval in enumerate(self._record_intervals):
             first_index, last_index = interval
-            values = []
+            data = []
             for j in range(first_index, last_index):
                 try:
-                    values.append(float(self._data[selected_property].iloc[j]))
+                    data.append(float(self._data[selected_property].iloc[j]))
                 except ValueError:
                     continue
-            if not values:
+            if not data:
                 logging.error('The interval {:d} of file {} does not contain any number'.format(i+1, self._filename))
                 return None
             else:
                 self._statistics[selected_property].setdefault('intervals', []).append(i+1)
-                self._statistics[selected_property].setdefault('averages', []).append(np.average(values))
-                self._statistics[selected_property].setdefault('stddevs', []).append(np.std(values))
-                self._statistics[selected_property].setdefault('medians', []).append(np.median(values))
-                self._statistics[selected_property].setdefault('1st quantiles', []).append(np.quantile(values, 0.25))
-                self._statistics[selected_property].setdefault('3rd quantiles', []).append(np.quantile(values, 0.75))
-                self._statistics[selected_property].setdefault('skewnesses', []).append(stats.skew(values))
-                self._statistics[selected_property].setdefault('kurtosis', []).append(stats.kurtosis(values))
+                self._statistics[selected_property].setdefault('data', []).append(data)
+                self._statistics[selected_property].setdefault('averages', []).append(np.average(data))
+                self._statistics[selected_property].setdefault('stddevs', []).append(np.std(data))
+                self._statistics[selected_property].setdefault('medians', []).append(np.median(data))
+                self._statistics[selected_property].setdefault('1st quantiles', []).append(np.quantile(data, 0.25))
+                self._statistics[selected_property].setdefault('3rd quantiles', []).append(np.quantile(data, 0.75))
+                self._statistics[selected_property].setdefault('skewnesses', []).append(stats.skew(data))
+                self._statistics[selected_property].setdefault('kurtosis', []).append(stats.kurtosis(data))
 
         return self._statistics[selected_property]
 

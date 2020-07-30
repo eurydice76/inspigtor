@@ -4,6 +4,7 @@ import os
 from PyQt5 import QtGui, QtWidgets
 
 from inspigtor.gui.dialogs.group_averages_dialog import GroupAveragesDialog
+from inspigtor.gui.dialogs.group_medians_dialog import GroupMediansDialog
 from inspigtor.gui.dialogs.group_statistics_dialog import GroupStatisticsDialog
 from inspigtor.gui.models.groups_model import GroupsModel
 from inspigtor.gui.models.individuals_model import IndividualsModel
@@ -38,6 +39,7 @@ class StatisticsWidget(QtWidgets.QWidget):
         self._main_window.display_group_averages.connect(self.on_display_group_averages)
         self._main_window.display_group_time_effect_statistics.connect(self.on_display_group_time_effect_statistics)
         self._main_window.export_group_statistics.connect(self.on_export_group_statistics)
+        self._main_window.display_group_medians.connect(self.on_display_group_medians)
 
     def build_layout(self):
         """Build the layout.
@@ -102,6 +104,61 @@ class StatisticsWidget(QtWidgets.QWidget):
             last_index = groups_model.index(groups_model.rowCount()-1, 0)
             self._groups_list.setCurrentIndex(last_index)
 
+    def on_display_group_averages(self):
+        """Display the group averages.
+        """
+
+        # No pig loaded, return
+        n_pigs = self._pigs_model.rowCount()
+        if n_pigs == 0:
+            logging.warning('No pigs loaded yet')
+            return
+
+        # No group defined, return
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No group defined yet')
+            return
+
+        dialog = GroupAveragesDialog(self._pigs_model, self._groups_list.model(), self)
+        dialog.show()
+
+    def on_display_group_medians(self):
+        """Display the group medians.
+        """
+
+        # No pig loaded, return
+        n_pigs = self._pigs_model.rowCount()
+        if n_pigs == 0:
+            logging.warning('No pigs loaded yet')
+            return
+
+        # No group defined, return
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No group defined yet')
+            return
+
+        dialog = GroupMediansDialog(self._pigs_model, self._groups_list.model(), self)
+        dialog.show()
+
+    def on_display_group_time_effect_statistics(self):
+        """Display the group/time effect statistics.
+        """
+
+        n_pigs = self._pigs_model.rowCount()
+        if n_pigs == 0:
+            logging.warning('No pigs loaded yet')
+            return
+
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No groups defined yet')
+            return
+
+        dialog = GroupStatisticsDialog(self._pigs_model, self._groups_list.model(), self)
+        dialog.show()
+
     def on_export_group_statistics(self):
         """Event fired when the user clicks on the 'Export statistics' menu button.
         """
@@ -118,7 +175,7 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('No group defined yet')
             return
 
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Export statistics as ...', "Excel files (*.xls);;All Files (*)")
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Export statistics as ...', "Excel files (*.xls *.xlsx)")
         if not filename:
             return
 
@@ -141,39 +198,3 @@ class StatisticsWidget(QtWidgets.QWidget):
         individual_model = groups_model.data(index, 257)
 
         self._individuals_list.setModel(individual_model)
-
-    def on_display_group_averages(self):
-        """Display the group averages plot.
-        """
-
-        # No pig loaded, return
-        n_pigs = self._pigs_model.rowCount()
-        if n_pigs == 0:
-            logging.warning('No pigs loaded yet')
-            return
-
-        # No group defined, return
-        groups_model = self._groups_list.model()
-        if groups_model.rowCount() == 0:
-            logging.warning('No group defined yet')
-            return
-
-        dialog = GroupAveragesDialog(self._pigs_model, self._groups_list.model(), self)
-        dialog.show()
-
-    def on_display_group_time_effect_statistics(self):
-        """Display the group/time effect statistics.
-        """
-
-        n_pigs = self._pigs_model.rowCount()
-        if n_pigs == 0:
-            logging.warning('No pigs loaded yet')
-            return
-
-        groups_model = self._groups_list.model()
-        if groups_model.rowCount() == 0:
-            logging.warning('No groups defined yet')
-            return
-
-        dialog = GroupStatisticsDialog(self._pigs_model, self._groups_list.model(), self)
-        dialog.show()

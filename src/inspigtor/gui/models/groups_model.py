@@ -216,17 +216,18 @@ class GroupsModel(QtGui.QStandardItemModel):
             worksheet.write('G1', 'skewness')
             worksheet.write('H1', 'kurtosis')
 
-   for i, (interval, groups) in enumerate(averages_per_interval.items()):
+        for i, (interval, groups) in enumerate(averages_per_interval.items()):
 
-        for group_name, averages in groups.items():
-            worksheet = workbook.get_worksheet_by_name(group_name)
-            worksheet.write('A{}'.format(i+2), interval)
-            worksheet.write('B{}'.format(i+2), np.average(averages))
-            worksheet.write('C{}'.format(i+2), np.std(averages))
-            worksheet.write('D{}'.format(i+2), np.median(averages))
-            worksheet.write('E{}'.format(i+2), np.quantile(averages, 0.25))
-            worksheet.write('F{}'.format(i+2), np.quantile(averages, 0.75))
-            worksheet.write('G{}'.format(i+2), stats.skew(averages))
-            worksheet.write('H{}'.format(i+2), stats.kurtosis(averages))
+            for group_name, averages in groups.items():
 
-    workbook.close()
+                worksheet = workbook.get_worksheet_by_name(group_name)
+                worksheet.write('A{}'.format(i+2), interval)
+                worksheet.write('B{}'.format(i+2), np.average(averages))
+                worksheet.write('C{}'.format(i+2), np.std(averages))
+                worksheet.write('D{}'.format(i+2), np.median(averages))
+                worksheet.write('E{}'.format(i+2), np.quantile(averages, 0.25))
+                worksheet.write('F{}'.format(i+2), np.quantile(averages, 0.75))
+                worksheet.write('G{}'.format(i+2), stats.skew(averages))
+                worksheet.write('H{}'.format(i+2), stats.kurtosis(averages))
+
+        workbook.close()

@@ -32,6 +32,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     export_group_statistics = QtCore.pyqtSignal()
 
+    display_group_medians = QtCore.pyqtSignal()
+
     def __init__(self, parent=None):
         """Constructor.
         """
@@ -104,7 +106,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         group_menu = menubar.addMenu('&Groups')
         add_group_action = QtWidgets.QAction('&Add group', self)
-        add_group_action.setShortcut('Ctrl+A')
+        add_group_action.setShortcut('Ctrl+G')
         add_group_action.setStatusTip('Add new group')
         add_group_action.triggered.connect(self.on_add_new_group)
         group_menu.addAction(add_group_action)
@@ -117,6 +119,12 @@ class MainWindow(QtWidgets.QMainWindow):
         display_group_averages_action.triggered.connect(self.on_display_group_averages)
         group_menu.addAction(display_group_averages_action)
 
+        display_group_medians_action = QtWidgets.QAction('Display &medians', self)
+        display_group_medians_action.setShortcut('Ctrl+M')
+        display_group_medians_action.setStatusTip('Display averages and std for each group')
+        display_group_medians_action.triggered.connect(self.on_display_group_medians)
+        group_menu.addAction(display_group_medians_action)
+
         export_group_statistics = QtWidgets.QAction('&Export statistics', self)
         export_group_statistics.setShortcut('Ctrl+E')
         export_group_statistics.setStatusTip('Export statistics (average, std, quartile ...)')
@@ -126,7 +134,7 @@ class MainWindow(QtWidgets.QMainWindow):
         group_menu.addSeparator()
 
         display_group_time_effect_action = QtWidgets.QAction('D&isplay group/time effect statistics', self)
-        display_group_time_effect_action.setShortcut('Ctrl+G')
+        display_group_time_effect_action.setShortcut('Ctrl+T')
         display_group_time_effect_action.setStatusTip('Display group/time effect statistics')
         display_group_time_effect_action.triggered.connect(self.on_display_group_time_effect_statistics)
         group_menu.addAction(display_group_time_effect_action)
@@ -167,7 +175,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._statistics_widget = StatisticsWidget(pigs_model, self)
 
         self._tabs.addTab(self._intervals_widget, 'Intervals')
-        self._tabs.addTab(self._statistics_widget, 'Statistics')
+        self._tabs.addTab(self._statistics_widget, 'Groups')
 
         self._logger = QTextEditLogger(self)
         self._logger.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
@@ -234,6 +242,12 @@ class MainWindow(QtWidgets.QMainWindow):
         """
 
         self.display_group_averages.emit()
+
+    def on_display_group_medians(self):
+        """Event fired when the user clicks on 'Display group medians plot' menu button.
+        """
+
+        self.display_group_medians.emit()
 
     def on_display_group_time_effect_statistics(self):
         """Event fire when the user clicks on 'Display group/time effect statistics' menu button.
@@ -404,11 +418,12 @@ class MainWindow(QtWidgets.QMainWindow):
         """Event fired when the menu button for the average of a selected property over a group is clicked.
         """
 
-        n_pigs = self._pigs_model.rowCount()
+        pigs_model = self._pigs_list.model()
+        n_pigs = pigs_model.rowCount()
         if n_pigs == 0:
             return
 
-        dialog = IndividualAveragesDialog(self._pigs_model, self)
+        dialog = IndividualAveragesDialog(pigs_model, self)
         dialog.show()
 
     def on_update_properties(self, properties):

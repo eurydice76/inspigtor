@@ -1,18 +1,18 @@
+import logging
+
 from PyQt5 import QtCore, QtWidgets
 
 from pylab import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-
-from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 
-class GroupAveragesDialog(QtWidgets.QDialog):
+class GroupMediansDialog(QtWidgets.QDialog):
     """This class implements a dialog that will show the averages of a given property for the groups defined so far.
     """
 
     def __init__(self, pigs_model, groups_model, parent):
 
-        super(GroupAveragesDialog, self).__init__(parent)
+        super(GroupMediansDialog, self).__init__(parent)
 
         self._pigs_model = pigs_model
 
@@ -47,15 +47,15 @@ class GroupAveragesDialog(QtWidgets.QDialog):
         """Build and/or initialize the widgets of the dialog.
         """
 
-        self.setWindowTitle('Group averages for {} property'.format(self._selected_property))
+        self.setWindowTitle('Group medians for {} property'.format(self._selected_property))
 
         # Build the matplotlib imsho widget
         self._figure = Figure()
         self._canvas = FigureCanvasQTAgg(self._figure)
-        self._toolbar = NavigationToolbarWithExportButton(self._canvas, self)
+        self._toolbar = NavigationToolbar2QT(self._canvas, self)
 
         self._selected_group_combo = QtWidgets.QComboBox()
-        group_names = ['all'] + [self._groups_model.item(i).data(QtCore.Qt.DisplayRole) for i in range(self._groups_model.rowCount())]
+        group_names = [self._groups_model.item(i).data(QtCore.Qt.DisplayRole) for i in range(self._groups_model.rowCount())]
         self._selected_group_combo.addItems(group_names)
 
     def init_ui(self):
@@ -82,10 +82,17 @@ class GroupAveragesDialog(QtWidgets.QDialog):
             return
 
         group = selected_group_model.item(row, 0).data(QtCore.Qt.DisplayRole)
-        if group == 'all':
-            selected_groups = range(self._groups_model.rowCount())
-        else:
-            selected_groups = [row-1]
+        if not self._groups_model.findItems(group, QtCore.Qt.MatchExactly):
+            logging.warning('Can not find group with name {}'.format(group))
+            return
+
+        individuals_model = self._groups_model.data(self._groups_model.index(row, 0), 257)
+        if individuals_model is None or individuals_model.rowCount() == 0:
+            return
+
+        individual_averages = individuals_model.get_averages()
+        if individual_averages is None:
+            return
 
         # If there is already a plot, remove it
         if hasattr(self, '_axes'):
@@ -96,19 +103,6 @@ class GroupAveragesDialog(QtWidgets.QDialog):
         self._axes.set_xlabel('interval')
         self._axes.set_ylabel(self._selected_property)
 
-        for group_id in selected_groups:
-
-            individuals_model = self._groups_model.data(self._groups_model.index(group_id, 0), 257)
-            if individuals_model is None or individuals_model.rowCount() == 0:
-                continue
-
-            temp = individuals_model.get_group_averages()
-            if temp is None:
-                return
-            averages, stds = temp
-
-            self._axes.errorbar(range(1, len(averages)+1), averages, yerr=stds, fmt='o')
-
-        self._axes.legend([self._groups_model.item(i).data(QtCore.Qt.DisplayRole) for i in range(self._groups_model.rowCount())])
+        self._plot = self._axes.boxplot(individual_averages, showfliers=False)
 
         self._canvas.draw()

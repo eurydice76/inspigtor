@@ -24,10 +24,7 @@ class IndividualsModel(QtGui.QStandardItemModel):
         self._pigs_model = pigs_model
 
     def get_averages(self):
-        """Compute the average and standard deviation for this set of individuals.
-
-        Returns:
-            2-tuple: the average and standard deviation
+        """Returns the averages of each individual of this set.
         """
 
         pigs = [self.item(i).data(QtCore.Qt.DisplayRole) for i in range(self.rowCount())]
@@ -52,7 +49,23 @@ class IndividualsModel(QtGui.QStandardItemModel):
 
             previous_intervals = intervals
 
-        all_individual_averages = np.array(all_individual_averages)
+        # Transpose the nested list
+        all_individual_averages = [list(x) for x in zip(*all_individual_averages)]
+
+        return all_individual_averages
+
+    def get_group_averages(self):
+        """Compute the average and standard deviation for this set of individuals.
+
+        Returns:
+            2-tuple: the average and standard deviation for each interval for this sets of individuals
+        """
+
+        all_individual_averages = self.get_averages()
+        if not all_individual_averages:
+            return None
+
+        all_individual_averages = np.array(all_individual_averages).T
 
         averages = np.average(all_individual_averages, axis=0)
         stds = np.std(all_individual_averages, axis=0)
