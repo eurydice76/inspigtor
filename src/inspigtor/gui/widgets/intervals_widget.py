@@ -192,8 +192,8 @@ class IntervalsWidget(QtWidgets.QWidget):
 
         coverages = reader.get_coverages(self._pigs_model.selected_property)
 
-        t0_interval_index = reader.t0_interval_index
-        index = model.index(t0_interval_index-1, 0)
+        t_initial_interval_index = reader.t_initial_interval_index
+        index = model.index(t_initial_interval_index-1, 0)
         model.setData(index, QtGui.QBrush(QtCore.Qt.red), QtCore.Qt.ForegroundRole)
 
         self._coverages_widget.update_coverage_plot(coverages)

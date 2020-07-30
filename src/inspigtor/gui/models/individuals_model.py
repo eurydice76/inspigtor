@@ -58,7 +58,7 @@ class IndividualsModel(QtGui.QStandardItemModel):
         """Compute the average and standard deviation for this set of individuals.
 
         Returns:
-            2-tuple: the average and standard deviation for each interval for this sets of individuals
+            2-tuple: the average and standard deviation for each interval for this set of individuals
         """
 
         all_individual_averages = self.get_averages()

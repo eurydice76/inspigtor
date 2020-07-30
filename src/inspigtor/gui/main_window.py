@@ -15,7 +15,7 @@ from inspigtor.gui.widgets.copy_pastable_tableview import CopyPastableTableView
 from inspigtor.gui.widgets.intervals_widget import IntervalsWidget
 from inspigtor.gui.widgets.logger_widget import QTextEditLogger
 from inspigtor.gui.widgets.statistics_widget import StatisticsWidget
-from inspigtor.readers.picco2_reader import PiCCO2FileReader
+from inspigtor.readers.picco2_reader import PiCCO2FileReader, PiCCO2FileReaderError
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -287,7 +287,7 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 # Reads the csv file and bind it to the model's item
                 reader = PiCCO2FileReader(csv_file)
-            except IOError as err:
+            except PiCCO2FileReaderError as err:
                 logging.error(str(err))
                 continue
             item.setData(reader, 257)
