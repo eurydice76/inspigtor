@@ -15,7 +15,7 @@ from inspigtor.gui.widgets.copy_pastable_tableview import CopyPastableTableView
 from inspigtor.gui.widgets.intervals_widget import IntervalsWidget
 from inspigtor.gui.widgets.logger_widget import QTextEditLogger
 from inspigtor.gui.widgets.statistics_widget import StatisticsWidget
-from inspigtor.readers.picco2_reader import PiCCO2FileReader, PiCCO2FileReaderError
+from inspigtor.kernel.readers.picco2_reader import PiCCO2FileReader, PiCCO2FileReaderError
 
 
 class MainWindow(QtWidgets.QMainWindow):

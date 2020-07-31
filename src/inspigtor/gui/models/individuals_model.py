@@ -65,9 +65,9 @@ class IndividualsModel(QtGui.QStandardItemModel):
         if not all_individual_averages:
             return None
 
-        all_individual_averages = np.array(all_individual_averages).T
+        all_individual_averages = np.array(all_individual_averages)
 
-        averages = np.average(all_individual_averages, axis=0)
-        stds = np.std(all_individual_averages, axis=0)
+        averages = np.average(all_individual_averages, axis=1)
+        stds = np.std(all_individual_averages, axis=1)
 
         return averages, stds

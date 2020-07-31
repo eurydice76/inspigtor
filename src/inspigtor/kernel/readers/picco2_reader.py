@@ -17,8 +17,6 @@ class PiCCO2FileReaderError(Exception):
     """Exception for PiCCO2 file reader.
     """
 
-    pass
-
 
 class PiCCO2FileReader:
     """This class implements the PiCCO2 device reader.
@@ -121,7 +119,7 @@ class PiCCO2FileReader:
                 delta_ts.append('-'+str(-delta_t))
 
         if not valid_t_minus_10:
-            raise IOError('Invalid value for Tinitial parameters')
+            raise PiCCO2FileReaderError('Invalid value for Tinitial parameters')
 
         # Add a column to the original data which show the delta t regarding t_zero - 10 minutes
         self._data.insert(loc=2, column='delta_t', value=delta_ts)
@@ -167,14 +165,16 @@ class PiCCO2FileReader:
             the value of the statistics over record intervals
         """
 
-        # If the selected property is cached, just return its current value
+        if selected_property not in list(self._data.columns):
+            raise PiCCO2FileReaderError('Property {} is unknown'.format(selected_property))
+
+            # If the selected property is cached, just return its current value
         if selected_property in self._statistics:
             return self._statistics[selected_property]
 
         # Some record intervals must have been set before
         if not self._record_intervals:
-            logging.error('No record intervals defined yet')
-            return None
+            raise PiCCO2FileReaderError('No record intervals defined yet')
 
         if interval_indexes is None:
             interval_indexes = range(len(self._record_intervals))
@@ -192,8 +192,7 @@ class PiCCO2FileReader:
                 except ValueError:
                     continue
             if not data:
-                logging.error('The interval {:d} of file {} does not contain any number'.format(index+1, self._filename))
-                return None
+                raise PiCCO2FileReaderError('The interval {:d} of file {} does not contain any number'.format(index+1, self._filename))
             else:
                 self._statistics[selected_property].setdefault('intervals', []).append(index+1)
                 self._statistics[selected_property].setdefault('data', []).append(data)
