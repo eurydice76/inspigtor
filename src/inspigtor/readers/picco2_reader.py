@@ -8,6 +8,8 @@ import numpy as np
 
 import scipy.stats as stats
 
+import xlsxwriter
+
 import pandas as pd
 
 
@@ -392,32 +394,44 @@ class PiCCO2FileReader:
 
         return self.t_interval_index(self._parameters['Tinitial'])
 
-    def write_summary(self, selected_property='APs'):
-        """Write the summay about the statistics for a selected property
+    def write_summary(self, filename, selected_property='APs'):
+        """Write the summay about the statistics for a selected property to an excel file.
 
         Args:
+            filename (str): the excel filename
             selected_property (str): the selected property for which the summary will be written.
         """
 
         # The selected property must be in the cache
-        if not selected_property in self._statistics:
-            logging.warning('Statistics for property {} has not yet been computed.'.format(selected_property))
+        stats = self._statistics.get(selected_property, self.get_descriptive_statistics(selected_property))
+        if not stats:
             return
 
-        summary_file_dirname = os.path.dirname(self._filename)
-        summary_file_basename = os.path.splitext(os.path.basename(self._filename))[0]
-        summary_file = os.path.join(summary_file_dirname, '{}_summary_{}.txt'.format(summary_file_basename, selected_property))
+        workbook = xlsxwriter.Workbook(filename)
+        worksheet = workbook.add_worksheet(os.path.basename(self._filename) if len(self._filename) <= 31 else 'pig')
+        worksheet.write('K1', 'Selected property')
+        worksheet.write('K2', selected_property)
+        worksheet.write('A1', 'Interval')
+        worksheet.write('B1', 'Average')
+        worksheet.write('C1', 'Std Dev')
+        worksheet.write('D1', 'Median')
+        worksheet.write('E1', '1st quartile')
+        worksheet.write('F1', '3rd quartile')
+        worksheet.write('G1', 'skewness')
+        worksheet.write('H1', 'kurtosis')
 
-        averages = [np.nan if v is None else v for v in self._statistics[selected_property]['averages']]
-        stds = [np.nan if v is None else v for v in self._statistics[selected_property]['stds']]
+        for i, interval in enumerate(stats['intervals']):
 
-        n_intervals = len(averages)
+            worksheet.write('A{}'.format(i+2), interval)
+            worksheet.write('B{}'.format(i+2), stats['averages'][i])
+            worksheet.write('C{}'.format(i+2), stats['stddevs'][i])
+            worksheet.write('D{}'.format(i+2), stats['medians'][i])
+            worksheet.write('E{}'.format(i+2), stats['1st quantiles'][i])
+            worksheet.write('F{}'.format(i+2), stats['3rd quantiles'][i])
+            worksheet.write('G{}'.format(i+2), stats['skewnesses'][i])
+            worksheet.write('H{}'.format(i+2), stats['kurtosis'][i])
 
-        with open(summary_file, 'w') as fout:
-            fout.write('interval;average;std')
-            fout.write('\n')
-            for i in range(n_intervals):
-                fout.write('{:d};{:f};{:f}\n'.format(i+1, averages[i], stds[i]))
+        workbook.close()
 
 
 if __name__ == '__main__':

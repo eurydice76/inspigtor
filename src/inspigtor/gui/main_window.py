@@ -48,6 +48,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._data_table.customContextMenuRequested.connect(self.on_show_data_table_menu)
         self._pigs_list.double_clicked_empty.connect(self.on_load_experiment_data)
+        self._pigs_list.customContextMenuRequested.connect(self.on_show_pigs_list_menu)
         self._intervals_widget.record_interval_selected.connect(self.on_record_interval_selected)
         self._intervals_widget.update_properties.connect(self.on_update_properties)
         self.pig_selected.connect(self._intervals_widget.on_update_record_intervals)
@@ -152,6 +153,7 @@ class MainWindow(QtWidgets.QMainWindow):
         pigs_model = PigsDataModel()
         self._pigs_list.setModel(pigs_model)
         self._pigs_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self._pigs_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
         self._selected_property_label = QtWidgets.QLabel('Selected property')
 
@@ -401,6 +403,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         menu = QtWidgets.QMenu()
 
+        menu.addSeparator()
+
         plot_menu = QtWidgets.QMenu('Plot')
 
         pigs_model = self._pigs_list.model()
@@ -426,6 +430,31 @@ class MainWindow(QtWidgets.QMainWindow):
         dialog = IndividualAveragesDialog(pigs_model, self)
         dialog.show()
 
+    def on_show_pigs_list_menu(self, point):
+        """Event fired when the user right-clicks on the pigs list.
+
+        This will pop up a contextual menu.
+        """
+
+        menu = QtWidgets.QMenu()
+
+        write_summary_menu = QtWidgets.QMenu('Write summary')
+
+        pigs_model = self._pigs_list.model()
+        if pigs_model.rowCount() == 0:
+            return
+
+        reader = pigs_model.item(self._pigs_list.currentIndex().row(), 0).data(257)
+
+        properties = reader.data.columns
+        for prop in properties:
+            action = write_summary_menu.addAction(prop)
+            action.triggered.connect(lambda checked, prop=prop: self.on_write_summary(checked, prop))
+
+        menu.addMenu(write_summary_menu)
+
+        menu.exec_(QtGui.QCursor.pos())
+
     def on_update_properties(self, properties):
         """Event fired when a pig is loaded.
 
@@ -441,6 +470,33 @@ class MainWindow(QtWidgets.QMainWindow):
         index = self._selected_property_combo.findText('APs', QtCore.Qt.MatchFixedString)
         if index >= 0:
             self._selected_property_combo.setCurrentIndex(index)
+
+    def on_write_summary(self, checked, selected_property):
+        """Event fired when the user click on the 'Write summary' menu button of pigs list contextual menu.
+        """
+
+        print(selected_property)
+
+        pigs_model = self._pigs_list.model()
+
+        if pigs_model.rowCount() == 0:
+            return
+
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Write summary as ...', filter="Excel files (*.xls *.xlsx)")
+        if not filename:
+            return
+
+        filename_noext, ext = os.path.splitext(filename)
+        if ext not in ['.xls', '.xlsx']:
+            logging.warning('Bad file extension for output excel file {}. It will be replaced by ".xlsx"'.format(filename))
+            filename = filename_noext + '.xlsx'
+
+        index = self._pigs_list.currentIndex()
+        reader = pigs_model.data(index, 257)
+        try:
+            reader.write_summary(filename)
+        except PiCCO2FileReaderError as e:
+            logging.error(str(e))
 
     def update_progress_bar(self, step):
         """Updates the progress bar.

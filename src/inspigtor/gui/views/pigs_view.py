@@ -13,7 +13,6 @@ class PigsView(QtWidgets.QListView):
     def mouseDoubleClickEvent(self, event):
         """Event called when the user double click on the empty list view.
 
-
         Args:
             event (PyQt5.QtCore.QEvent): the double click event.
         """

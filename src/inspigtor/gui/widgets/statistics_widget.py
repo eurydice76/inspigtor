@@ -175,7 +175,7 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('No group defined yet')
             return
 
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Export statistics as ...', "Excel files (*.xls *.xlsx)")
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Export statistics as ...', filter="Excel files (*.xls *.xlsx)")
         if not filename:
             return
 
