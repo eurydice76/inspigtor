@@ -402,7 +402,6 @@ class PiCCO2FileReader:
             selected_property (str): the selected property for which the summary will be written.
         """
 
-        # The selected property must be in the cache
         stats = self._statistics.get(selected_property, self.get_descriptive_statistics(selected_property))
         if not stats:
             return
@@ -417,7 +416,7 @@ class PiCCO2FileReader:
         worksheet.write('D1', 'Median')
         worksheet.write('E1', '1st quartile')
         worksheet.write('F1', '3rd quartile')
-        worksheet.write('G1', 'skewness')
+        worksheet.write('G1', 'Skewness')
         worksheet.write('H1', 'kurtosis')
 
         for i, interval in enumerate(stats['intervals']):

@@ -3,6 +3,7 @@ import numpy as np
 from PyQt5 import QtWidgets
 
 from inspigtor.gui.widgets.group_effect_widget import GroupEffectWidget
+from inspigtor.gui.widgets.premortem_statistics_widget import PreMortemStatisticsWidget
 from inspigtor.gui.widgets.time_effect_widget import TimeEffectWidget
 
 
@@ -19,10 +20,6 @@ class GroupStatisticsDialog(QtWidgets.QDialog):
         self._selected_property = self._pigs_model.selected_property
 
         self.init_ui()
-
-    def build_events(self):
-        """Set the signal/slots of the main window
-        """
 
     def build_layout(self):
         """Build the layout.
@@ -52,9 +49,13 @@ class GroupStatisticsDialog(QtWidgets.QDialog):
 
         self._time_effect_widget = TimeEffectWidget(self._groups_model, self)
 
+        self._premortem_statistics_widget = PreMortemStatisticsWidget(self._groups_model, self)
+
         self._tabs.addTab(self._group_effect_widget, 'Group effect')
 
         self._tabs.addTab(self._time_effect_widget, 'Time effect')
+
+        self._tabs.addTab(self._premortem_statistics_widget, 'Pre-mortem statistics')
 
     def init_ui(self):
         """Initialiwes the dialog.
@@ -63,5 +64,3 @@ class GroupStatisticsDialog(QtWidgets.QDialog):
         self.build_widgets()
 
         self.build_layout()
-
-        self.build_events()

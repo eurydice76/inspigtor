@@ -28,20 +28,30 @@ class GroupsModel(QtGui.QStandardItemModel):
 
         self._pigs_model = pigs_model
 
-    def _get_averages_per_interval(self):
+    def _get_averages_per_interval(self, selected_groups):
         """Returns a nested dictionary where the key are the interval number and the value
         a collections.OrderedDict whose key/values are respectively the group and the average of each individual
         of the group for a given property.
+
+        Args:
+            groups (list of str): the selected groups
 
         Returns:
             collections.OrderedDict: the averages per interval
         """
 
+        all_groups = set([self.item(i).data(QtCore.Qt.DisplayRole) for i in range(self.rowCount())])
+        groups = list(all_groups.intersection(selected_groups))
+        if not groups:
+            return None
+
         averages_per_interval = collections.OrderedDict()
 
-        for i in range(self.rowCount()):
-            item = self.item(i)
-            group = item.data(QtCore.Qt.DisplayRole)
+        for group in groups:
+            items = self.findItems(group, QtCore.Qt.MatchExactly)
+            if not items:
+                continue
+            item = items[0]
             individuals_model = item.data(257)
 
             pigs = [individuals_model.item(i).data(QtCore.Qt.DisplayRole) for i in range(individuals_model.rowCount())]
@@ -69,21 +79,27 @@ class GroupsModel(QtGui.QStandardItemModel):
 
         return averages_per_interval
 
-    def evaluate_global_group_effect(self):
+    def evaluate_global_group_effect(self, groups=None):
         """Performs a statistical test to check whether the groups belongs to the same distribution.
         If there are only two groups, a Mann-Whitney test is performed otherwise a Kruskal-Wallis test
         is performed.
+
+        Args:
+            groups (list of str): the selected group. if None all the groups of the model will be used.
 
         Returns:
             list: the p values resulting from Kruskal-Wallis or Mann-Whitney tests.
         """
 
-        n_groups = self.rowCount()
+        if groups is None:
+            groups = [self.item(i).data(QtCore.Qt.DisplayRole) for i in range(self.rowCount())]
+
+        n_groups = len(groups)
         if n_groups < 2:
             logging.warning('There is less than two groups. Can not perform any global statistical test.')
             return []
 
-        averages_per_interval = self._get_averages_per_interval()
+        averages_per_interval = self._get_averages_per_interval(groups)
         if not averages_per_interval:
             return None
 
@@ -99,20 +115,26 @@ class GroupsModel(QtGui.QStandardItemModel):
 
         return p_values
 
-    def evaluate_pairwise_group_effect(self):
+    def evaluate_pairwise_group_effect(self, groups=None):
         """Performs a pairwise statistical test to check whether each pair of groups belongs to the same distribution.
         This should be evaluated only if the number of groups is >= 2.
+
+        Args:
+            groups (list of str): the selected group. if None all the groups of the model will be used.
 
         Returns:
             dict: the p values define for each pair of groups resulting from the Dunn test.
         """
 
-        n_groups = self.rowCount()
+        if groups is None:
+            groups = [self.item(i).data(QtCore.Qt.DisplayRole) for i in range(self.rowCount())]
+
+        n_groups = len(groups)
         if n_groups < 2:
             logging.warning('There is less than two groups. Can not perform any global statistical test.')
             return []
 
-        averages_per_interval = self._get_averages_per_interval()
+        averages_per_interval = self._get_averages_per_interval(groups)
         if not averages_per_interval:
             return None
 
@@ -133,16 +155,22 @@ class GroupsModel(QtGui.QStandardItemModel):
 
         return pairwise_p_values
 
-    def evaluate_global_time_effect(self):
+    def evaluate_global_time_effect(self, groups=None):
         """Performs a Friedman statistical test to check whether the groups belongs to the same distribution.
         If there are only two groups, a Mann-Whitney test is performed otherwise a Kruskal-Wallis test
         is performed.
+
+        Args:
+            groups (list of str): the selected group. if None all the groups of the model will be used.
 
         Returns:
             collections.OrderedDict: the p values for each group resulting from the Friedman test
         """
 
-        averages_per_interval = self._get_averages_per_interval()
+        if groups is None:
+            groups = [self.item(i).data(QtCore.Qt.DisplayRole) for i in range(self.rowCount())]
+
+        averages_per_interval = self._get_averages_per_interval(groups)
         if not averages_per_interval:
             return None
 
@@ -161,15 +189,21 @@ class GroupsModel(QtGui.QStandardItemModel):
 
         return p_values
 
-    def evaluate_pairwise_time_effect(self):
+    def evaluate_pairwise_time_effect(self, groups=None):
         """Performs a Dunn statistical test to check whether within each group the averages values defined over
         intervals belongs to the same distribution.
+
+        Args:
+            groups(list of str): the selected group. if None all the groups of the model will be used.
 
         Returns:
             collections.OrderedDict: the p values matrix for each group resulting from the Dunn test
         """
 
-        averages_per_interval = self._get_averages_per_interval()
+        if groups is None:
+            groups = [self.item(i).data(QtCore.Qt.DisplayRole) for i in range(self.rowCount())]
+
+        averages_per_interval = self._get_averages_per_interval(groups)
 
         averages_per_group = collections.OrderedDict()
 
@@ -189,14 +223,18 @@ class GroupsModel(QtGui.QStandardItemModel):
 
         return p_values
 
-    def export_statistics(self, filename):
+    def export_statistics(self, filename, groups=None):
         """Export basic statistics (average, median, std, quartile ...) for each group and interval to an excel file.
 
         Args:
             filename (str): the output excel filename
+            groups(list of str): the selected group. if None all the groups of the model will be used.
         """
 
-        averages_per_interval = self._get_averages_per_interval()
+        if groups is None:
+            groups = [self.item(i).data(QtCore.Qt.DisplayRole) for i in range(self.rowCount())]
+
+        averages_per_interval = self._get_averages_per_interval(groups)
         if not averages_per_interval:
             return None
 
@@ -213,7 +251,7 @@ class GroupsModel(QtGui.QStandardItemModel):
             worksheet.write('D1', 'Median')
             worksheet.write('E1', '1st quartile')
             worksheet.write('F1', '3rd quartile')
-            worksheet.write('G1', 'skewness')
+            worksheet.write('G1', 'Skewness')
             worksheet.write('H1', 'kurtosis')
 
         for i, (interval, groups) in enumerate(averages_per_interval.items()):
@@ -231,3 +269,60 @@ class GroupsModel(QtGui.QStandardItemModel):
                 worksheet.write('H{}'.format(i+2), stats.kurtosis(averages))
 
         workbook.close()
+
+    def premortem_statistics(self, n_last_intervals, groups=None):
+        """Compute the premortem statisitcs to assess putative time effect.
+
+        This is basically the same procedure than for the global and pairwise time effect analysis
+        excepted that only the interval before Tinitial and the n last intervals are considered.
+        This allows pigs with different intervals due to different time of death to be compared through
+        a statistical test.
+
+        Args:
+            n_last_intervals (int): the number of last intervals to consider
+            groups (list of str): the groups on which the analysis should be performed
+        """
+
+        if groups is None:
+            groups = [self.item(i).data(QtCore.Qt.DisplayRole) for i in range(self.rowCount())]
+
+        friedman_statistics = {}
+        dunn_statistics = {}
+
+        for group in groups:
+            items = self.findItems(group, QtCore.Qt.MatchExactly)
+            if not items:
+                continue
+
+            averages = []
+
+            individuals_model = items[0].data(257)
+            for i in range(individuals_model.rowCount()):
+                pig_name = individuals_model.item(i).data(QtCore.Qt.DisplayRole)
+                try:
+                    pig_item = self._pigs_model.findItems(pig_name, QtCore.Qt.MatchExactly)[0]
+                except IndexError:
+                    return None
+                reader = pig_item.data(257)
+
+                t_initial_interval_index = reader.t_initial_interval_index
+                t_final_interval_index = reader.t_final_interval_index
+
+                # These are the intervals used for the analysis
+                intervals = [t_initial_interval_index - 1] + list(range(t_final_interval_index-n_last_intervals+1, t_final_interval_index+1))
+
+                descriptive_statistics = reader.get_descriptive_statistics(self._pigs_model.selected_property, interval_indexes=intervals)
+                if not descriptive_statistics:
+                    return None
+
+                averages.append(descriptive_statistics['averages'])
+
+            # Transpose the nested list such as the number rows is the number of intervals and the number of columns the number of individuals
+            averages = [list(x) for x in zip(*averages)]
+
+            friedman_statistics[group] = stats.friedmanchisquare(*averages).pvalue
+            df = sk.posthoc_dunn(averages)
+            df = df.round(4)
+            dunn_statistics[group] = df
+
+        return friedman_statistics, dunn_statistics
