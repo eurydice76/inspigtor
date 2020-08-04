@@ -23,9 +23,9 @@ class PiCCO2FileReader:
 
     This is the base class of inspigtor application. It reads and parses a PiCCO2 file and computes statistics on
     the properties stored in the file (columns). To be read properly, the file must contain a cell with the starting
-    time and ending time of the experiment. The Tinitial time will be used to define a Tinitial - 10 minutes time starting from
+    time and ending time of the experiment. The t_initial time will be used to define a t_initial - 10 minutes time starting from
     which records intervals will be computed. Those record intervals are those interval on which the average and std
-    of a given property are computed. The Tfinal time will be used to compute pre-mortem statistics.
+    of a given property are computed. The t_final time will be used to compute pre-mortem statistics.
     """
 
     def __init__(self, filename):
@@ -58,11 +58,11 @@ class PiCCO2FileReader:
         # Create a dict out of those parameters
         general_info_dict = collections.OrderedDict(zip(general_info_fields, general_info))
 
-        if 'Tinitial' not in general_info_dict:
-            raise PiCCO2FileReaderError('Missing Tinitial value in the general parameters section.')
+        if 't_initial' not in general_info_dict:
+            raise PiCCO2FileReaderError('Missing t_initial value in the general parameters section.')
 
-        if 'Tfinal' not in general_info_dict:
-            raise PiCCO2FileReaderError('Missing Tfinal value in the general parameters section.')
+        if 't_final' not in general_info_dict:
+            raise PiCCO2FileReaderError('Missing t_final value in the general parameters section.')
 
         # Read the fourth line which contains the titles of the pig id parameters
         line = csv_file.readline().strip()
@@ -90,12 +90,12 @@ class PiCCO2FileReader:
         self._exp_start = datetime.strptime(self._data.iloc[0]['Time'], self._time_fmt)
 
         # The evaluation of intervals starts at t_zero - 10 minutes (as asked by experimentalists)
-        t_minus_10_strptime = datetime.strptime(general_info_dict['Tinitial'], self._time_fmt) - datetime.strptime('00:10:00', self._time_fmt)
+        t_minus_10_strptime = datetime.strptime(general_info_dict['t_initial'], self._time_fmt) - datetime.strptime('00:10:00', self._time_fmt)
 
         # If the t_zero - 10 is earlier than the beginning of the experiment set t_minus_10_strptime to the starting time of the experiment
         if t_minus_10_strptime.days < 0 or t_minus_10_strptime.seconds < 600:
             logging.warning(
-                'Tinitial - 10 minutes is earlier than the beginning of the experiment for file {}. Will use its starting time instead.'.format(self._filename))
+                't_initial - 10 minutes is earlier than the beginning of the experiment for file {}. Will use its starting time instead.'.format(self._filename))
             t_minus_10_strptime = self._exp_start
         else:
             t_minus_10_strptime = datetime.strptime(str(t_minus_10_strptime), self._time_fmt)
@@ -119,7 +119,7 @@ class PiCCO2FileReader:
                 delta_ts.append('-'+str(-delta_t))
 
         if not valid_t_minus_10:
-            raise PiCCO2FileReaderError('Invalid value for Tinitial parameters')
+            raise PiCCO2FileReaderError('Invalid value for t_initial parameters')
 
         # Add a column to the original data which show the delta t regarding t_zero - 10 minutes
         self._data.insert(loc=2, column='delta_t', value=delta_ts)
@@ -127,9 +127,6 @@ class PiCCO2FileReader:
         csv_file.close()
 
         self._record_intervals = []
-
-        # This dictionary will cache the statistics computed for selected properties to save some time
-        self.reset_statistics_cache()
 
     @ property
     def data(self):
@@ -150,61 +147,6 @@ class PiCCO2FileReader:
         """
 
         return self._filename
-
-    def get_descriptive_statistics(self, selected_property='APs', interval_indexes=None):
-        """Compute the statistics for a given property for the current record intervals.
-
-        For each record interval, computes the average and the standard deviation of the selected property.
-
-        Args:
-            selected_property (str): the selected property
-            interval_indexes (list of int): the indexes of the record intervals to select. If None, all the record intervals will be used.
-
-        Returns:
-            dict: a dictionary whose keys are the different statistics computed (e;g; average, median ...) and the values are the list of 
-            the value of the statistics over record intervals
-        """
-
-        if selected_property not in list(self._data.columns):
-            raise PiCCO2FileReaderError('Property {} is unknown'.format(selected_property))
-
-            # If the selected property is cached, just return its current value
-        if selected_property in self._statistics:
-            return self._statistics[selected_property]
-
-        # Some record intervals must have been set before
-        if not self._record_intervals:
-            raise PiCCO2FileReaderError('No record intervals defined yet')
-
-        if interval_indexes is None:
-            interval_indexes = range(len(self._record_intervals))
-
-        self._statistics[selected_property] = {}
-
-        # Compute for each record interval the average and standard deviation of the selected property
-        for index in interval_indexes:
-            interval = self._record_intervals[index]
-            first_index, last_index = interval
-            data = []
-            for j in range(first_index, last_index):
-                try:
-                    data.append(float(self._data[selected_property].iloc[j]))
-                except ValueError:
-                    continue
-            if not data:
-                raise PiCCO2FileReaderError('The interval {:d} of file {} does not contain any number'.format(index+1, self._filename))
-            else:
-                self._statistics[selected_property].setdefault('intervals', []).append(index+1)
-                self._statistics[selected_property].setdefault('data', []).append(data)
-                self._statistics[selected_property].setdefault('averages', []).append(np.average(data))
-                self._statistics[selected_property].setdefault('stddevs', []).append(np.std(data))
-                self._statistics[selected_property].setdefault('medians', []).append(np.median(data))
-                self._statistics[selected_property].setdefault('1st quantiles', []).append(np.quantile(data, 0.25))
-                self._statistics[selected_property].setdefault('3rd quantiles', []).append(np.quantile(data, 0.75))
-                self._statistics[selected_property].setdefault('skewnesses', []).append(stats.skew(data))
-                self._statistics[selected_property].setdefault('kurtosis', []).append(stats.kurtosis(data))
-
-        return self._statistics[selected_property]
 
     def get_coverages(self, selected_property='APs'):
         """Compute the coverages for a given property.
@@ -239,22 +181,68 @@ class PiCCO2FileReader:
 
         return coverages
 
+    def get_descriptive_statistics(self, selected_property='APs', interval_indexes=None):
+        """Compute the statistics for a given property for the current record intervals.
+
+        For each record interval, computes the average and the standard deviation of the selected property.
+
+        Args:
+            selected_property (str): the selected property
+            interval_indexes (list of int): the indexes of the record intervals to select. If None, all the record intervals will be used.
+
+        Returns:
+            dict: a dictionary whose keys are the different statistics computed (e;g; average, median ...) and the values are the list of 
+            the value of the statistics over record intervals
+        """
+
+        if selected_property not in list(self._data.columns):
+            raise PiCCO2FileReaderError('Property {} is unknown'.format(selected_property))
+
+        # Some record intervals must have been set before
+        if not self._record_intervals:
+            raise PiCCO2FileReaderError('No record intervals defined yet')
+
+        if interval_indexes is None:
+            interval_indexes = list(range(len(self._record_intervals)))
+
+        statistics = {}
+
+        # Compute for each record interval the average and standard deviation of the selected property
+        for index in interval_indexes:
+            interval = self._record_intervals[index]
+            first_index, last_index = interval
+            data = []
+            for j in range(first_index, last_index):
+                try:
+                    data.append(float(self._data[selected_property].iloc[j]))
+                except ValueError:
+                    continue
+
+            if not data:
+                raise PiCCO2FileReaderError('The interval {:d} of file {} does not contain any number'.format(index+1, self._filename))
+            else:
+                statistics.setdefault('intervals', []).append(index+1)
+                statistics.setdefault('data', []).append(data)
+                statistics.setdefault('averages', []).append(np.average(data))
+                statistics.setdefault('stddevs', []).append(np.std(data))
+                statistics.setdefault('medians', []).append(np.median(data))
+                statistics.setdefault('1st quantiles', []).append(np.quantile(data, 0.25))
+                statistics.setdefault('3rd quantiles', []).append(np.quantile(data, 0.75))
+                statistics.setdefault('skewnesses', []).append(stats.skew(data))
+                statistics.setdefault('kurtosis', []).append(stats.kurtosis(data))
+
+        return statistics
+
     def get_t_final_index(self):
-        """Return the first index whose time is superior to Tfinal.
+        """Return the first index whose time is superior to t_final.
         """
 
         for index, time in enumerate(self._data['Time']):
-            delta_t = datetime.strptime(self._parameters['Tfinal'], self._time_fmt) - datetime.strptime(time, self._time_fmt)
+            delta_t = datetime.strptime(self._parameters['t_final'], self._time_fmt) - datetime.strptime(time, self._time_fmt)
             if delta_t.days < 0:
                 return index
 
         return len(self._data['Time'])
-
-    def reset_statistics_cache(self):
-        """Reset the statistics cache.
-        """
-
-        self._statistics = {}
 
     def set_record_intervals(self, intervals):
         """Set the record intervals.
@@ -262,9 +250,6 @@ class PiCCO2FileReader:
         Args:
             intervals (list of 4-tuples): the record time in seconds. List of 4-tuples of the form (start,end,record,offset).
         """
-
-        # Clear the statistics cache
-        self.reset_statistics_cache()
 
         t_max = self.get_t_final_index()
 
@@ -357,6 +342,16 @@ class PiCCO2FileReader:
 
         return record_times
 
+    @property
+    def t_final_interval_index(self):
+        """Returns the index of the interval which contains t_final.
+
+        Returns:
+            int: the index
+        """
+
+        return self.t_interval_index(self._parameters['t_final'])
+
     def t_interval_index(self, time):
         """Returns the index of the interval which contains a given time.
 
@@ -371,27 +366,17 @@ class PiCCO2FileReader:
             if delta_t.days < 0:
                 return index
 
-        return -1
-
-    @property
-    def t_final_interval_index(self):
-        """Returns the index of the interval which contains Tfinal.
-
-        Returns:
-            int: the index
-        """
-
-        return self.t_interval_index(self._parameters['Tfinal'])
+        return len(record_times) - 1
 
     @property
     def t_initial_interval_index(self):
-        """Returns the index of the interval which contains Tinitial.
+        """Returns the index of the interval which contains t_initial.
 
         Returns:
             int: the index
         """
 
-        return self.t_interval_index(self._parameters['Tinitial'])
+        return self.t_interval_index(self._parameters['t_initial'])
 
     def write_summary(self, filename, selected_property='APs'):
         """Write the summay about the statistics for a selected property to an excel file.
@@ -401,7 +386,7 @@ class PiCCO2FileReader:
             selected_property (str): the selected property for which the summary will be written.
         """
 
-        stats = self._statistics.get(selected_property, self.get_descriptive_statistics(selected_property))
+        stats = self.get_descriptive_statistics(selected_property)
         if not stats:
             return
 
@@ -435,7 +420,7 @@ class PiCCO2FileReader:
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    reader.set_record_intervals([('00:00:00', '10:00:00', 120, 30)])
+    reader.set_record_intervals([('00:00:00', '6:15:00', 300, 0)])
     print(reader.record_intervals)
     print(reader.record_times)
     print(reader.t_initial_interval_index)

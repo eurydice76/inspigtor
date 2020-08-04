@@ -144,8 +144,8 @@ class IntervalsWidget(QtWidgets.QWidget):
         main_window.init_progress_bar(n_pigs)
 
         for row in range(n_pigs):
-            model_index = self._pigs_model.index(row, 0)
-            reader = self._pigs_model.data(model_index, 257)
+            index = self._pigs_model.index(row, 0)
+            reader = self._pigs_model.data(index, self._pigs_model.Reader)
             reader.set_record_intervals(interval_settings)
             main_window.update_progress_bar(row+1)
 

@@ -1,24 +1,25 @@
+import logging
+
 from PyQt5 import QtCore, QtWidgets
 
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
+from inspigtor.kernel.pigs.pigs_pool import PigsPoolError
 
 
 class GroupAveragesDialog(QtWidgets.QDialog):
     """This class implements a dialog that will show the averages of a given property for the groups defined so far.
     """
 
-    def __init__(self, pigs_model, groups_model, parent):
+    def __init__(self, selected_property, groups_model, parent):
 
         super(GroupAveragesDialog, self).__init__(parent)
 
-        self._pigs_model = pigs_model
-
         self._groups_model = groups_model
 
-        self._selected_property = self._pigs_model.selected_property
+        self._selected_property = selected_property
 
         self.init_ui()
 
@@ -55,7 +56,10 @@ class GroupAveragesDialog(QtWidgets.QDialog):
         self._toolbar = NavigationToolbarWithExportButton(self._canvas, self)
 
         self._selected_group_combo = QtWidgets.QComboBox()
-        group_names = ['all'] + [self._groups_model.item(i).data(QtCore.Qt.DisplayRole) for i in range(self._groups_model.rowCount())]
+        group_names = ['all']
+        for i in range(self._groups_model.rowCount()):
+            index = self._groups_model.index(i)
+            group_names.append(self._groups_model.data(index, QtCore.Qt.DisplayRole))
         self._selected_group_combo.addItems(group_names)
 
     def init_ui(self):
@@ -98,17 +102,22 @@ class GroupAveragesDialog(QtWidgets.QDialog):
 
         for group_id in selected_groups:
 
-            individuals_model = self._groups_model.data(self._groups_model.index(group_id, 0), 257)
-            if individuals_model is None or individuals_model.rowCount() == 0:
+            pigs_pool = self._groups_model.data(self._groups_model.index(group_id, 0), self._groups_model.PigsPool)
+            if len(pigs_pool) == 0:
                 continue
 
-            temp = individuals_model.get_group_averages()
-            if temp is None:
+            try:
+                temp = pigs_pool.get_averages_per_interval(self._selected_property)
+            except PigsPoolError as error:
+                logging.error(str(error))
                 return
+
             averages, stds = temp
 
             self._axes.errorbar(range(1, len(averages)+1), averages, yerr=stds, fmt='o')
 
-        self._axes.legend([self._groups_model.item(i).data(QtCore.Qt.DisplayRole) for i in range(self._groups_model.rowCount())])
+        group_names = self._groups_model.pigs_groups.groups.keys()
+
+        self._axes.legend(group_names)
 
         self._canvas.draw()

@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import sys
@@ -8,12 +9,13 @@ import inspigtor
 from inspigtor.__pkginfo__ import __version__
 from inspigtor.gui.dialogs.individual_averages_dialog import IndividualAveragesDialog
 from inspigtor.gui.dialogs.property_plotter_dialog import PropertyPlotterDialog
-from inspigtor.gui.models.pigs_data_model import PigsDataModel
+from inspigtor.gui.models.pigs_pool_model import PigsPoolModel
 from inspigtor.gui.models.pandas_data_model import PandasDataModel
 from inspigtor.gui.views.pigs_view import PigsView
 from inspigtor.gui.widgets.copy_pastable_tableview import CopyPastableTableView
 from inspigtor.gui.widgets.intervals_widget import IntervalsWidget
 from inspigtor.gui.widgets.logger_widget import QTextEditLogger
+from inspigtor.gui.widgets.multiple_directories_selector import MultipleDirectoriesSelector
 from inspigtor.gui.widgets.statistics_widget import StatisticsWidget
 from inspigtor.kernel.readers.picco2_reader import PiCCO2FileReader, PiCCO2FileReaderError
 
@@ -28,7 +30,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     display_group_averages = QtCore.pyqtSignal()
 
-    display_group_time_effect_statistics = QtCore.pyqtSignal()
+    display_group_effect_statistics = QtCore.pyqtSignal()
+
+    display_time_effect_statistics = QtCore.pyqtSignal()
+
+    display_premortem_statistics = QtCore.pyqtSignal()
 
     export_group_statistics = QtCore.pyqtSignal()
 
@@ -38,7 +44,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Constructor.
         """
 
-        super(MainWindow, self).__init__()
+        super(MainWindow, self).__init__(parent)
 
         self.init_ui()
 
@@ -93,11 +99,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         file_menu = menubar.addMenu('&File')
 
-        file_action = QtWidgets.QAction('&File', self)
+        file_action = QtWidgets.QAction('&Open PiCCO2 file', self)
         file_action.setShortcut('Ctrl+O')
-        file_action.setStatusTip('Open PiCCO2 files')
+        file_action.setStatusTip('Open PiCCO2 (csv) files')
         file_action.triggered.connect(self.on_load_experiment_data)
         file_menu.addAction(file_action)
+
+        dir_action = QtWidgets.QAction('&Open PiCCO2 directories', self)
+        dir_action.setShortcut('Ctrl+I')
+        dir_action.setStatusTip('Open PiCCO2 (csv) files')
+        dir_action.triggered.connect(self.on_load_experimental_dirs)
+        file_menu.addAction(dir_action)
+
+        file_menu.addSeparator()
 
         exit_action = QtWidgets.QAction('&Exit', self)
         exit_action.setShortcut('Ctrl+Q')
@@ -107,7 +121,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         group_menu = menubar.addMenu('&Groups')
         add_group_action = QtWidgets.QAction('&Add group', self)
-        add_group_action.setShortcut('Ctrl+G')
+        add_group_action.setShortcut('Ctrl+R')
         add_group_action.setStatusTip('Add new group')
         add_group_action.triggered.connect(self.on_add_new_group)
         group_menu.addAction(add_group_action)
@@ -126,19 +140,33 @@ class MainWindow(QtWidgets.QMainWindow):
         display_group_medians_action.triggered.connect(self.on_display_group_medians)
         group_menu.addAction(display_group_medians_action)
 
-        export_group_statistics = QtWidgets.QAction('&Export statistics', self)
+        export_group_statistics = QtWidgets.QAction('&Export descriptive statistics', self)
         export_group_statistics.setShortcut('Ctrl+E')
-        export_group_statistics.setStatusTip('Export statistics (average, std, quartile ...)')
+        export_group_statistics.setStatusTip('Export descriptive statistics (average, std, quartile ...)')
         export_group_statistics.triggered.connect(self.on_export_group_statistics)
         group_menu.addAction(export_group_statistics)
 
         group_menu.addSeparator()
 
-        display_group_time_effect_action = QtWidgets.QAction('D&isplay group/time effect statistics', self)
-        display_group_time_effect_action.setShortcut('Ctrl+T')
-        display_group_time_effect_action.setStatusTip('Display group/time effect statistics')
-        display_group_time_effect_action.triggered.connect(self.on_display_group_time_effect_statistics)
-        group_menu.addAction(display_group_time_effect_action)
+        statistics_menu = menubar.addMenu('&Statistics')
+
+        group_effect_action = QtWidgets.QAction('Group effect', self)
+        group_effect_action.setShortcut('Ctrl+G')
+        group_effect_action.setStatusTip('Display group effect statistics')
+        group_effect_action.triggered.connect(self.on_display_group_effect_statistics)
+        statistics_menu.addAction(group_effect_action)
+
+        time_effect_action = QtWidgets.QAction('Time effect', self)
+        time_effect_action.setShortcut('Ctrl+T')
+        time_effect_action.setStatusTip('Display time effect statistics')
+        time_effect_action.triggered.connect(self.on_display_time_effect_statistics)
+        statistics_menu.addAction(time_effect_action)
+
+        premortem_action = QtWidgets.QAction('Premortem', self)
+        premortem_action.setShortcut('Ctrl+P')
+        premortem_action.setStatusTip('Display premortem statistics')
+        premortem_action.triggered.connect(self.on_display_premortem_statistics)
+        statistics_menu.addAction(premortem_action)
 
     def build_widgets(self):
         """Build the widgets.
@@ -150,7 +178,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._pigs_list.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
         self._pigs_list.setDragEnabled(True)
-        pigs_model = PigsDataModel()
+        pigs_model = PigsPoolModel(self)
         self._pigs_list.setModel(pigs_model)
         self._pigs_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self._pigs_list.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -251,11 +279,23 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.display_group_medians.emit()
 
-    def on_display_group_time_effect_statistics(self):
-        """Event fire when the user clicks on 'Display group/time effect statistics' menu button.
+    def on_display_group_effect_statistics(self):
+        """Event fire when the user clicks on 'Display group effect' menu button.
         """
 
-        self.display_group_time_effect_statistics.emit()
+        self.display_group_effect_statistics.emit()
+
+    def on_display_time_effect_statistics(self):
+        """Event fire when the user clicks on 'Display time effect' menu button.
+        """
+
+        self.display_time_effect_statistics.emit()
+
+    def on_display_premortem_statistics(self):
+        """Event fire when the user clicks on 'Display premortem statistics' menu button.
+        """
+
+        self.display_premortem_statistics.emit()
 
     def on_export_group_statistics(self):
         """Event fired when the user clicks on the 'Export statistics' menu button.
@@ -282,21 +322,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # Loop over the pig directories
         for progress, csv_file in enumerate(csv_files):
 
-            if pigs_model.findItems(csv_file, QtCore.Qt.MatchExactly):
+            if pigs_model.get_pig(csv_file) is not None:
                 continue
 
-            item = QtGui.QStandardItem(csv_file)
-            try:
-                # Reads the csv file and bind it to the model's item
-                reader = PiCCO2FileReader(csv_file)
-            except PiCCO2FileReaderError as err:
-                logging.error(str(err))
-                continue
-            item.setData(reader, 257)
-
-            # The tooltip will be the parameters found in the csv file
-            item.setData("\n".join([": ".join([k, v]) for k, v in reader.parameters.items()]), QtCore.Qt.ToolTipRole)
-            pigs_model.appendRow(item)
+            reader = PiCCO2FileReader(csv_file)
+            pigs_model.add_reader(reader)
 
             n_loaded_files += 1
             self.update_progress_bar(progress+1)
@@ -307,6 +337,49 @@ class MainWindow(QtWidgets.QMainWindow):
         self._pigs_list.setCurrentIndex(pigs_model.index(0, 0))
 
         logging.info('Loaded successfully {} files over {}'.format(n_loaded_files, n_csv_files))
+
+    def on_load_experimental_dirs(self):
+        """Opens several experimental directories.
+        """
+
+        # Pop up a file browser
+        selector = MultipleDirectoriesSelector()
+        if not selector.exec_():
+            return
+
+        experimental_dirs = selector.selectedFiles()
+        if not experimental_dirs:
+            return
+
+        pigs_model = self._pigs_list.model()
+
+        self.init_progress_bar(len(experimental_dirs))
+
+        filenames = []
+
+        n_loaded_files = 0
+
+        # Loop over the pig directories
+        for progress, exp_dir in enumerate(experimental_dirs):
+
+            data_files = glob.glob(os.path.join(exp_dir, '*.csv'))
+
+            # Loop over the Data*csv csv files found in the current oig directory
+            for data_file in data_files:
+                reader = PiCCO2FileReader(data_file)
+                pigs_model.add_reader(reader)
+
+                filenames.append(data_file)
+
+            n_loaded_files += 1
+            self.update_progress_bar(progress+1)
+
+        # Create a signal/slot connexion for row changed event
+        self._pigs_list.selectionModel().currentChanged.connect(self.on_select_pig)
+
+        self._pigs_list.setCurrentIndex(pigs_model.index(0, 0))
+
+        logging.info('Loaded successfully {} files over {}'.format(n_loaded_files, len(experimental_dirs)))
 
     def on_plot_property(self, checked, selected_property):
         """Plot one property of the PiCCO file.
@@ -319,7 +392,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Fetch the selected reader
         selected_row = self._pigs_list.currentIndex().row()
-        reader = pigs_model.item(selected_row, 0).data(257)
+        reader = pigs_model.item(selected_row, 0).data(pigs_model.Reader)
 
         # Build the x and y values
         xs = []
@@ -373,17 +446,12 @@ class MainWindow(QtWidgets.QMainWindow):
             index (PyQt5.QtCore.QModelIndex): the index of the pig in the corresponding list view
         """
 
-        item = self._pigs_list.model().item(index.row(), index.column())
-
-        reader = item.data(257)
-        if reader is None:
-            return
+        reader = self._pigs_list.model().data(index, PigsPoolModel.Reader)
 
         # Update the data table with the selected data
         data = reader.data
         self._data_table.setModel(PandasDataModel(data))
 
-        reader = item.data(257)
         record_intervals = reader.record_intervals
         if record_intervals is None:
             record_intervals = []
@@ -408,7 +476,7 @@ class MainWindow(QtWidgets.QMainWindow):
         plot_menu = QtWidgets.QMenu('Plot')
 
         pigs_model = self._pigs_list.model()
-        reader = pigs_model.item(self._pigs_list.currentIndex().row(), 0).data(257)
+        reader = pigs_model.item(self._pigs_list.currentIndex().row(), 0).data(pigs_model.Reader)
 
         properties = reader.data.columns
         for prop in properties:
@@ -444,7 +512,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if pigs_model.rowCount() == 0:
             return
 
-        reader = pigs_model.item(self._pigs_list.currentIndex().row(), 0).data(257)
+        current_row = self._pigs_list.currentIndex().row()
+
+        reader = pigs_model.data(pigs_model.index(current_row), pigs_model.Reader)
 
         properties = reader.data.columns
         for prop in properties:
@@ -475,8 +545,6 @@ class MainWindow(QtWidgets.QMainWindow):
         """Event fired when the user click on the 'Write summary' menu button of pigs list contextual menu.
         """
 
-        print(selected_property)
-
         pigs_model = self._pigs_list.model()
 
         if pigs_model.rowCount() == 0:
@@ -492,11 +560,16 @@ class MainWindow(QtWidgets.QMainWindow):
             filename = filename_noext + '.xlsx'
 
         index = self._pigs_list.currentIndex()
-        reader = pigs_model.data(index, 257)
+        reader = pigs_model.data(index, pigs_model.Reader)
         try:
             reader.write_summary(filename)
         except PiCCO2FileReaderError as e:
             logging.error(str(e))
+
+    @property
+    def selected_property(self):
+
+        return self._selected_property_combo.currentText()
 
     def update_progress_bar(self, step):
         """Updates the progress bar.

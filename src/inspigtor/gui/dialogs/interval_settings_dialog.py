@@ -106,7 +106,7 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
         self._start_line_edit = QtWidgets.QLineEdit('00:00:00')
         self._start_line_edit.setValidator(validator)
 
-        self._end_line_edit = QtWidgets.QLineEdit('02:00:00')
+        self._end_line_edit = QtWidgets.QLineEdit('06:15:00')
         self._end_line_edit.setValidator(validator)
 
         self._record_spinbox = QtWidgets.QSpinBox()

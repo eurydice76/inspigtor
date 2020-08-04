@@ -10,20 +10,18 @@ class GroupMediansDialog(QtWidgets.QDialog):
     """This class implements a dialog that will show the averages of a given property for the groups defined so far.
     """
 
-    def __init__(self, pigs_model, groups_model, parent):
+    def __init__(self, selected_property, groups_model, parent):
 
         super(GroupMediansDialog, self).__init__(parent)
 
-        self._pigs_model = pigs_model
-
         self._groups_model = groups_model
 
-        self._selected_property = self._pigs_model.selected_property
+        self._selected_property = selected_property
 
         self.init_ui()
 
     def build_events(self):
-        """Set the signal/slots of the main window
+        """Set the signal/slots.
         """
 
         self._selected_group_combo.currentIndexChanged.connect(self.on_select_group)
@@ -55,7 +53,7 @@ class GroupMediansDialog(QtWidgets.QDialog):
         self._toolbar = NavigationToolbar2QT(self._canvas, self)
 
         self._selected_group_combo = QtWidgets.QComboBox()
-        group_names = [self._groups_model.item(i).data(QtCore.Qt.DisplayRole) for i in range(self._groups_model.rowCount())]
+        group_names = [self._groups_model.data(self._groups_model.index(row), QtCore.Qt.DisplayRole) for row in range(self._groups_model.rowCount())]
         self._selected_group_combo.addItems(group_names)
 
     def init_ui(self):
@@ -82,15 +80,16 @@ class GroupMediansDialog(QtWidgets.QDialog):
             return
 
         group = selected_group_model.item(row, 0).data(QtCore.Qt.DisplayRole)
-        if not self._groups_model.findItems(group, QtCore.Qt.MatchExactly):
+        pigs_groups = self._groups_model.pigs_groups
+        if group not in pigs_groups:
             logging.warning('Can not find group with name {}'.format(group))
             return
 
-        individuals_model = self._groups_model.data(self._groups_model.index(row, 0), 257)
-        if individuals_model is None or individuals_model.rowCount() == 0:
+        pigs_pool = self._groups_model.data(self._groups_model.index(row, 0), self._groups_model.PigsPool)
+        if len(pigs_pool) == 0:
             return
 
-        individual_averages = individuals_model.get_averages()
+        individual_averages = pigs_pool.get_statistics(self._selected_property)
         if individual_averages is None:
             return
 

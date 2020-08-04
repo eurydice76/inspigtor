@@ -1,7 +1,5 @@
 import logging
 
-import numpy as np
-
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from pylab import Figure
@@ -9,15 +7,17 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationTool
 
 from inspigtor.gui.dialogs.dunn_matrix_dialog import DunnMatrixDialog
 from inspigtor.gui.models.pvalues_data_model import PValuesDataModel
+from inspigtor.gui.utils.helper_functions import find_main_window
 from inspigtor.gui.widgets.copy_pastable_tableview import CopyPastableTableView
 
 
-class PreMortemStatisticsWidget(QtWidgets.QWidget):
-    """This class implements the widget that will store the time-effect premortem statistics.
+class PreMortemStatisticsDialog(QtWidgets.QDialog):
+    """
     """
 
     def __init__(self, groups_model, parent=None):
-        super(PreMortemStatisticsWidget, self).__init__(parent)
+
+        super(PreMortemStatisticsDialog, self).__init__(parent)
 
         self._groups_model = groups_model
 
@@ -91,7 +91,8 @@ class PreMortemStatisticsWidget(QtWidgets.QWidget):
 
         self._selected_group_combo = QtWidgets.QComboBox()
 
-        selected_groups = [self._groups_model.item(i).data(QtCore.Qt.DisplayRole) for i in range(self._groups_model.rowCount())]
+        selected_groups = [self._groups_model.data(self._groups_model.index(row), QtCore.Qt.DisplayRole)
+                           for row in range(self._groups_model.rowCount())]
 
         self._selected_group_combo.addItems(selected_groups)
 
@@ -108,29 +109,30 @@ class PreMortemStatisticsWidget(QtWidgets.QWidget):
 
         n_last_intervals = self._n_last_intervals_spinbox.value()
 
-        friedman, dunn = self._groups_model.premortem_statistics(n_last_intervals)
+        main_window = find_main_window()
 
-        print(friedman)
+        n_groups = self._groups_model.rowCount()
 
-        print(dunn)
+        p_values = self._groups_model.premortem_statistics(n_last_intervals, selected_property=main_window.selected_property)
+
+        group_names = self._groups_model.pigs_groups.groups.keys()
+
+        self._friedman_p_values = dict(zip(group_names, [v[0] for v in p_values]))
+        self._dunn_p_values = dict(zip(group_names, [v[1] for v in p_values]))
+
+        self.display_time_effect()
 
     def display_time_effect(self):
         """Display the global time effect and the pairwise time effect.
         """
 
-        p_values = self._groups_model.evaluate_global_time_effect()
-        if not p_values:
-            return
-
         self._friedman_axes.clear()
         self._friedman_axes.set_xlabel('groups')
         self._friedman_axes.set_ylabel('Friedman p values')
 
-        self._friedman_axes.bar(list(p_values.keys()), list(p_values.values()))
+        self._friedman_axes.bar(self._friedman_p_values.keys(), self._friedman_p_values.values())
 
         self._friedman_canvas.draw()
-
-        self._pairwise_p_values = self._groups_model.evaluate_pairwise_time_effect()
 
         self.on_select_group(0)
 
@@ -143,8 +145,6 @@ class PreMortemStatisticsWidget(QtWidgets.QWidget):
         self.build_layout()
 
         self.build_events()
-
-        # self.display_time_effect()
 
     def on_export_dunn_table(self):
         """Export the current Dunn table to a csv file.
@@ -179,14 +179,14 @@ class PreMortemStatisticsWidget(QtWidgets.QWidget):
             selected_group (int): the selected group
         """
 
-        if not self._pairwise_p_values:
+        if not self._dunn_p_values:
             return
 
         selected_group = self._selected_group_combo.itemText(selected_group)
-        if selected_group not in self._pairwise_p_values:
+        if selected_group not in self._dunn_p_values:
             return
 
-        p_values = self._pairwise_p_values[selected_group]
+        p_values = self._dunn_p_values[selected_group]
 
         # p_values is a squared data frame
         n_rows, n_cols = p_values.shape

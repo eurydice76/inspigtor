@@ -1,11 +1,14 @@
+import logging
+
 import numpy as np
 
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
+from inspigtor.kernel.readers.picco2_reader import PiCCO2FileReaderError
 
 
 class IndividualAveragesDialog(QtWidgets.QDialog):
@@ -56,8 +59,8 @@ class IndividualAveragesDialog(QtWidgets.QDialog):
 
         pig_names = []
         for row in range(self._pigs_model.rowCount()):
-            current_item = self._pigs_model.item(row, 0)
-            pig_names.append(current_item.data(0))
+            index = self._pigs_model.index(row)
+            pig_names.append(self._pigs_model.data(index, QtCore.Qt.DisplayRole))
 
         self._selected_pig_combo = QtWidgets.QComboBox()
         self._selected_pig_combo.addItems(pig_names)
@@ -82,10 +85,12 @@ class IndividualAveragesDialog(QtWidgets.QDialog):
         """
 
         # Fetch the statistics (average and standard deviation) for the selected pig
-        selected_pig_item = self._pigs_model.item(row, 0)
-        reader = selected_pig_item.data(257)
-        individual_averages = reader.get_descriptive_statistics(self._selected_property)
-        if not individual_averages:
+        index = self._pigs_model.index(row)
+        reader = self._pigs_model.data(index, self._pigs_model.Reader)
+        try:
+            individual_averages = reader.get_descriptive_statistics(self._selected_property)
+        except PiCCO2FileReaderError as error:
+            logging.error(str(error))
             return
 
         xs = []

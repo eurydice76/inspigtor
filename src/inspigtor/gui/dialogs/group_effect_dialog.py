@@ -1,17 +1,24 @@
+import logging
+
 from PyQt5 import QtWidgets
 
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
+from inspigtor.gui.utils.helper_functions import find_main_window
 from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
+from inspigtor.kernel.pigs.pigs_groups import PigsGroupsError
 
 
-class GroupEffectWidget(QtWidgets.QWidget):
-    """This class implements the widget that stores the group effect statistics.
+class GroupEffectDialog(QtWidgets.QDialog):
+    """
     """
 
     def __init__(self, groups_model, parent=None):
-        super(GroupEffectWidget, self).__init__(parent)
+        """
+        """
+
+        super(GroupEffectDialog, self).__init__(parent)
 
         self._groups_model = groups_model
 
@@ -36,7 +43,7 @@ class GroupEffectWidget(QtWidgets.QWidget):
         self.setLayout(main_layout)
 
     def build_widgets(self):
-        """Builds the widgets.
+        """Build and/or initialize the widgets of the dialog.
         """
 
         self._kruskal_figure = Figure()
@@ -51,12 +58,30 @@ class GroupEffectWidget(QtWidgets.QWidget):
             self._kruskal_dunn_canvas = FigureCanvasQTAgg(self._kruskal_dunn_figure)
             self._kruskal_dunn_toolbar = NavigationToolbarWithExportButton(self._kruskal_dunn_canvas, self)
 
+        main_window = find_main_window()
+        self.setWindowTitle('Group effect statistics for {} property'.format(main_window.selected_property))
+
+    def init_ui(self):
+        """Initialiwes the dialog.
+        """
+
+        self.build_widgets()
+
+        self.build_layout()
+
+        self.display_group_effect()
+
     def display_group_effect(self):
         """Display the global group effect and the pairwise group effect if the number of groups is > 2.
         """
 
-        p_values = self._groups_model.evaluate_global_group_effect()
-        if not p_values:
+        main_window = find_main_window()
+        selected_property = main_window.selected_property
+
+        try:
+            p_values = self._groups_model.evaluate_global_group_effect(selected_property=selected_property)
+        except PigsGroupsError as error:
+            logging.error(str(error))
             return
 
         self._kruskal_axes.clear()
@@ -70,7 +95,7 @@ class GroupEffectWidget(QtWidgets.QWidget):
         self._kruskal_canvas.draw()
 
         if self._groups_model.rowCount() >= 3:
-            pairwise_p_values = self._groups_model.evaluate_pairwise_group_effect()
+            pairwise_p_values = self._groups_model.evaluate_pairwise_group_effect(selected_property=selected_property)
 
             self._kruskal_dunn_axes.clear()
             self._kruskal_dunn_axes.set_xlabel('interval')
@@ -82,13 +107,3 @@ class GroupEffectWidget(QtWidgets.QWidget):
             self._kruskal_dunn_axes.legend(pairwise_p_values.keys())
 
             self._kruskal_dunn_canvas.draw()
-
-    def init_ui(self):
-        """Initializes the ui
-        """
-
-        self.build_widgets()
-
-        self.build_layout()
-
-        self.display_group_effect()

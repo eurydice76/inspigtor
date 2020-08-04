@@ -5,10 +5,13 @@ from PyQt5 import QtGui, QtWidgets
 
 from inspigtor.gui.dialogs.group_averages_dialog import GroupAveragesDialog
 from inspigtor.gui.dialogs.group_medians_dialog import GroupMediansDialog
-from inspigtor.gui.dialogs.group_statistics_dialog import GroupStatisticsDialog
-from inspigtor.gui.models.groups_model import GroupsModel
-from inspigtor.gui.models.individuals_model import IndividualsModel
-from inspigtor.gui.widgets.droppable_list_view import DroppableListView
+from inspigtor.gui.dialogs.group_effect_dialog import GroupEffectDialog
+from inspigtor.gui.dialogs.premortem_statistics_dialog import PreMortemStatisticsDialog
+from inspigtor.gui.dialogs.time_effect_dialog import TimeEffectDialog
+from inspigtor.gui.models.pigs_groups_model import PigsGroupsModel
+from inspigtor.gui.models.pigs_pool_model import PigsPoolModel
+from inspigtor.gui.widgets.pigs_pool_list_view import PigsPoolListView
+from inspigtor.kernel.pigs.pigs_groups import PigsGroupsError
 
 
 class StatisticsWidget(QtWidgets.QWidget):
@@ -37,7 +40,9 @@ class StatisticsWidget(QtWidgets.QWidget):
         self._groups_list.selectionModel().currentChanged.connect(self.on_select_group)
         self._main_window.add_new_group.connect(self.on_add_group)
         self._main_window.display_group_averages.connect(self.on_display_group_averages)
-        self._main_window.display_group_time_effect_statistics.connect(self.on_display_group_time_effect_statistics)
+        self._main_window.display_group_effect_statistics.connect(self.on_display_group_effect_statistics)
+        self._main_window.display_time_effect_statistics.connect(self.on_display_time_effect_statistics)
+        self._main_window.display_premortem_statistics.connect(self.on_display_premortem_statistics)
         self._main_window.export_group_statistics.connect(self.on_export_group_statistics)
         self._main_window.display_group_medians.connect(self.on_display_group_medians)
 
@@ -70,10 +75,10 @@ class StatisticsWidget(QtWidgets.QWidget):
         self._groups_list = QtWidgets.QListView(self)
         self._groups_list.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._groups_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        groups_model = GroupsModel(self._pigs_model)
+        groups_model = PigsGroupsModel(self)
         self._groups_list.setModel(groups_model)
 
-        self._individuals_list = DroppableListView(self)
+        self._individuals_list = PigsPoolListView(self._pigs_model, self)
         self._individuals_list.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._individuals_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
@@ -94,15 +99,9 @@ class StatisticsWidget(QtWidgets.QWidget):
         """
 
         groups_model = self._groups_list.model()
-        if groups_model.findItems(group):
-            logging.warning('A group with the same name ({}) already exists.'.format(group))
-        else:
-            item = QtGui.QStandardItem(group)
-            individuals_model = IndividualsModel(self._pigs_model, groups_model)
-            item.setData(individuals_model, 257)
-            groups_model.appendRow(item)
-            last_index = groups_model.index(groups_model.rowCount()-1, 0)
-            self._groups_list.setCurrentIndex(last_index)
+        groups_model.add_group(group)
+        last_index = groups_model.index(groups_model.rowCount()-1, 0)
+        self._groups_list.setCurrentIndex(last_index)
 
     def on_display_group_averages(self):
         """Display the group averages.
@@ -120,7 +119,7 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('No group defined yet')
             return
 
-        dialog = GroupAveragesDialog(self._pigs_model, self._groups_list.model(), self)
+        dialog = GroupAveragesDialog(self._main_window.selected_property, self._groups_list.model(), self)
         dialog.show()
 
     def on_display_group_medians(self):
@@ -139,10 +138,27 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('No group defined yet')
             return
 
-        dialog = GroupMediansDialog(self._pigs_model, self._groups_list.model(), self)
+        dialog = GroupMediansDialog(self._main_window.selected_property, self._groups_list.model(), self)
         dialog.show()
 
-    def on_display_group_time_effect_statistics(self):
+    def on_display_group_effect_statistics(self):
+        """Display the group effect statistics.
+        """
+
+        n_pigs = self._pigs_model.rowCount()
+        if n_pigs == 0:
+            logging.warning('No pigs loaded yet')
+            return
+
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No groups defined yet')
+            return
+
+        dialog = GroupEffectDialog(self._groups_list.model(), self)
+        dialog.show()
+
+    def on_display_time_effect_statistics(self):
         """Display the group/time effect statistics.
         """
 
@@ -156,7 +172,24 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('No groups defined yet')
             return
 
-        dialog = GroupStatisticsDialog(self._pigs_model, self._groups_list.model(), self)
+        dialog = TimeEffectDialog(self._groups_list.model(), self)
+        dialog.show()
+
+    def on_display_premortem_statistics(self):
+        """Display the premortem statistics.
+        """
+
+        n_pigs = self._pigs_model.rowCount()
+        if n_pigs == 0:
+            logging.warning('No pigs loaded yet')
+            return
+
+        groups_model = self._groups_list.model()
+        if groups_model.rowCount() == 0:
+            logging.warning('No groups defined yet')
+            return
+
+        dialog = PreMortemStatisticsDialog(self._groups_list.model(), self)
         dialog.show()
 
     def on_export_group_statistics(self):
@@ -170,8 +203,8 @@ class StatisticsWidget(QtWidgets.QWidget):
             return
 
         # No group defined, return
-        groups_model = self._groups_list.model()
-        if groups_model.rowCount() == 0:
+        pigs_groups_model = self._groups_list.model()
+        if pigs_groups_model.rowCount() == 0:
             logging.warning('No group defined yet')
             return
 
@@ -184,7 +217,11 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('Bad file extension for output excel file {}. It will be replaced by ".xlsx"'.format(filename))
             filename = filename_noext + '.xlsx'
 
-        groups_model.export_statistics(filename)
+        try:
+            pigs_groups_model.pigs_groups.export_statistics(filename, selected_property=self._main_window.selected_property)
+        except PigsGroupsError as error:
+            logging.error(str(error))
+            return
 
     def on_select_group(self, index):
         """Updates the individuals list view.
@@ -195,6 +232,8 @@ class StatisticsWidget(QtWidgets.QWidget):
 
         groups_model = self._groups_list.model()
 
-        individual_model = groups_model.data(index, 257)
+        current_pig_pool = groups_model.data(index, groups_model.PigsPool)
 
-        self._individuals_list.setModel(individual_model)
+        pigs_pool_model = PigsPoolModel(self, current_pig_pool)
+
+        self._individuals_list.setModel(pigs_pool_model)

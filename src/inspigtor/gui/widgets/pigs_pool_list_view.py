@@ -4,10 +4,12 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 
-class DroppableListView(QtWidgets.QListView):
+class PigsPoolListView(QtWidgets.QListView):
 
-    def __init__(self, *args, **kwargs):
-        super(DroppableListView, self).__init__(*args, **kwargs)
+    def __init__(self, pigs_model, *args, **kwargs):
+        super(PigsPoolListView, self).__init__(*args, **kwargs)
+
+        self._pigs_model = pigs_model
 
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
@@ -36,18 +38,24 @@ class DroppableListView(QtWidgets.QListView):
         source_model.dropMimeData(event.mimeData(), QtCore.Qt.CopyAction, 0, 0, QtCore.QModelIndex())
 
         # Drop only those items which are not present in this widget
-        current_items = [self.model().item(i, 0).text() for i in range(self.model().rowCount())]
+        current_items = [self.model().data(self.model().index(i), QtCore.Qt.DisplayRole) for i in range(self.model().rowCount())]
         dragged_items = [source_model.item(i, 0).text() for i in range(source_model.rowCount())]
-        for item in dragged_items:
-            if item in current_items:
+        for pig_name in dragged_items:
+            if pig_name in current_items:
                 continue
 
-            item = QtGui.QStandardItem(item)
-            self.model().appendRow(item)
+            reader = self._pigs_model.get_reader(pig_name)
+            self.model().add_reader(reader)
 
     def keyPressEvent(self, event):
 
         if event.key() == QtCore.Qt.Key_Delete:
 
             for sel_index in reversed(self.selectedIndexes()):
-                self.model().removeRow(sel_index.row())
+                self.model().remove_reader(sel_index.data(QtCore.Qt.DisplayRole))
+                if self.model().rowCount() > 0:
+                    index = self.model().index(self.model().rowCount()-1)
+                    self.setCurrentIndex(index)
+
+        else:
+            super(PigsPoolListView, self).keyPressEvent(event)
