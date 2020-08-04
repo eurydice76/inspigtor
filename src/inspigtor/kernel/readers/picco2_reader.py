@@ -248,7 +248,7 @@ class PiCCO2FileReader:
         """Set the record intervals.
 
         Args:
-            intervals (list of 4-tuples): the record time in seconds. List of 4-tuples of the form (start,end,record,offset).
+            intervals (list of 4-tuples): the record intervals. List of 4-tuples of the form (start,end,record,offset).
         """
 
         t_max = self.get_t_final_index()
@@ -260,6 +260,9 @@ class PiCCO2FileReader:
         # Loop over each interval
         for interval in intervals:
             start, end, record, offset = interval
+            # The record and offset are converted from minutes to seconds
+            record *= 60
+            offset *= 60
             # Convert strptime to timedelta for further use
             start = (datetime.strptime(start, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
             end = (datetime.strptime(end, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
@@ -420,7 +423,7 @@ class PiCCO2FileReader:
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    reader.set_record_intervals([('00:00:00', '6:15:00', 300, 0)])
+    reader.set_record_intervals([('00:00:00', '6:15:00', 5, 0)])
     print(reader.record_intervals)
     print(reader.record_times)
     print(reader.t_initial_interval_index)

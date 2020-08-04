@@ -98,8 +98,8 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
 
         self._start_label = QtWidgets.QLabel('Start (H:M:S)')
         self._end_label = QtWidgets.QLabel('End (H:M:S)')
-        self._record_label = QtWidgets.QLabel('Record (s)')
-        self._offset_label = QtWidgets.QLabel('Offset (s)')
+        self._record_label = QtWidgets.QLabel('Record (min)')
+        self._offset_label = QtWidgets.QLabel('Offset (min)')
 
         validator = TimeValidator()
 
@@ -112,12 +112,12 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
         self._record_spinbox = QtWidgets.QSpinBox()
         self._record_spinbox.setMinimum(1)
         self._record_spinbox.setMaximum(20000)
-        self._record_spinbox.setValue(300)
+        self._record_spinbox.setValue(2)
 
         self._offset_spinbox = QtWidgets.QSpinBox()
         self._offset_spinbox.setMinimum(0)
         self._offset_spinbox.setMaximum(20000)
-        self._offset_spinbox.setValue(60)
+        self._offset_spinbox.setValue(0)
 
         self._button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
 
