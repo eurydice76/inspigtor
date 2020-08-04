@@ -74,8 +74,7 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         self._selected_group_combo = QtWidgets.QComboBox()
 
-        selected_groups = [self._groups_model.data(self._groups_model.index(row), QtCore.Qt.DisplayRole)
-                           for row in range(self._groups_model.rowCount())]
+        selected_groups = self._groups_model.selected_groups
 
         self._selected_group_combo.addItems(selected_groups)
 
@@ -92,7 +91,9 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         selected_property = main_window.selected_property
 
-        p_values = self._groups_model.evaluate_global_time_effect(selected_property)
+        selected_groups = self._groups_model.selected_groups
+
+        p_values = self._groups_model.evaluate_global_time_effect(selected_property=selected_property, selected_groups=selected_groups)
         if not p_values:
             return
 
@@ -100,11 +101,14 @@ class TimeEffectDialog(QtWidgets.QDialog):
         self._friedman_axes.set_xlabel('groups')
         self._friedman_axes.set_ylabel('Friedman p values')
 
+        self._friedman_axes.axhline(y=0.05, color='r')
+
         self._friedman_axes.bar(p_values.keys(), p_values.values())
 
         self._friedman_canvas.draw()
 
-        self._pairwise_p_values = self._groups_model.evaluate_pairwise_time_effect(selected_property)
+        self._pairwise_p_values = self._groups_model.evaluate_pairwise_time_effect(
+            selected_property=selected_property, selected_groups=selected_groups)
 
         self.on_select_group(0)
 

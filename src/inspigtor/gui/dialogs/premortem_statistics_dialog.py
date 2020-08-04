@@ -111,14 +111,14 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
 
         main_window = find_main_window()
 
-        n_groups = self._groups_model.rowCount()
+        selected_property = main_window.selected_property
 
-        p_values = self._groups_model.premortem_statistics(n_last_intervals, selected_property=main_window.selected_property)
+        selected_groups = self._groups_model.selected_groups
 
-        group_names = self._groups_model.pigs_groups.groups.keys()
+        p_values = self._groups_model.premortem_statistics(n_last_intervals, selected_property=selected_property, selected_groups=selected_groups)
 
-        self._friedman_p_values = dict(zip(group_names, [v[0] for v in p_values]))
-        self._dunn_p_values = dict(zip(group_names, [v[1] for v in p_values]))
+        self._friedman_p_values = dict(zip(p_values.keys(), [v[0] for v in p_values.values()]))
+        self._dunn_p_values = dict(zip(p_values.keys(), [v[1] for v in p_values.values()]))
 
         self.display_time_effect()
 
@@ -131,6 +131,8 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
         self._friedman_axes.set_ylabel('Friedman p values')
 
         self._friedman_axes.bar(self._friedman_p_values.keys(), self._friedman_p_values.values())
+
+        self._friedman_axes.axhline(y=0.05, color='r')
 
         self._friedman_canvas.draw()
 

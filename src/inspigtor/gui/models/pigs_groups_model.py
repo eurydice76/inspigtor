@@ -23,6 +23,8 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
 
         self._pigs_groups = PigsGroups()
 
+        self._selected_groups = []
+
     @property
     def pigs_groups(self):
         """
@@ -30,62 +32,45 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
 
         return self._pigs_groups
 
-    def premortem_statistics(self, n_last_intervals, selected_property='APs'):
+    def premortem_statistics(self, n_last_intervals, selected_property='APs', selected_groups=None):
         """
         """
 
-        n_groups = self.rowCount()
-
-        p_values = [self.data(self.index(row), PigsGroupsModel.PigsPool).premortem_statistics(
-            n_last_intervals, selected_property=selected_property) for row in range(n_groups)]
+        p_values = self._pigs_groups.premortem_statistics(n_last_intervals, selected_property=selected_property, selected_groups=selected_groups)
 
         return p_values
 
-    def evaluate_global_group_effect(self, selected_property='APs'):
+    def evaluate_global_group_effect(self, selected_property='APs', selected_groups=None):
         """
         """
 
-        p_values = self._pigs_groups.evaluate_global_group_effect(selected_property=selected_property)
+        p_values = self._pigs_groups.evaluate_global_group_effect(selected_property=selected_property, selected_groups=selected_groups)
 
         return p_values
 
-    def evaluate_pairwise_group_effect(self, selected_property='APs'):
+    def evaluate_pairwise_group_effect(self, selected_property='APs', selected_groups=None):
         """
         """
 
-        p_values = self._pigs_groups.evaluate_pairwise_group_effect(selected_property=selected_property)
+        p_values = self._pigs_groups.evaluate_pairwise_group_effect(selected_property=selected_property, selected_groups=selected_groups)
 
         return p_values
 
-    def evaluate_global_time_effect(self, selected_property='APs'):
+    def evaluate_global_time_effect(self, selected_property='APs', selected_groups=None):
         """
         """
 
-        n_groups = self.rowCount()
+        p_values = self._pigs_groups.evaluate_global_time_effect(selected_property=selected_property, selected_groups=selected_groups)
 
-        group_names = [self.data(self.index(row), QtCore.Qt.DisplayRole) for row in range(n_groups)]
+        return p_values
 
-        try:
-            p_values = [self.data(self.index(row), PigsGroupsModel.PigsPool).evaluate_global_time_effect(
-                selected_property=selected_property) for row in range(n_groups)]
-        except PigsPoolError as error:
-            logging.error(str(error))
-            return
-
-        return dict(zip(group_names, p_values))
-
-    def evaluate_pairwise_time_effect(self, selected_property='APs'):
+    def evaluate_pairwise_time_effect(self, selected_property='APs', selected_groups=None):
         """
         """
 
-        n_groups = self.rowCount()
+        p_values = self._pigs_groups.evaluate_pairwise_time_effect(selected_property=selected_property, selected_groups=selected_groups)
 
-        group_names = [self.data(self.index(row), QtCore.Qt.DisplayRole) for row in range(n_groups)]
-
-        p_values = [self.data(self.index(row), PigsGroupsModel.PigsPool).evaluate_pairwise_time_effect(
-            selected_property=selected_property) for row in range(n_groups)]
-
-        return dict(zip(group_names, p_values))
+        return p_values
 
     def add_group(self, group):
         """Add a group to the model.
@@ -102,6 +87,7 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
 
         try:
             self._pigs_groups.add_group(group, PigsPool())
+            self._selected_groups.append(True)
         except PigsGroupsError as error:
             logging.error(str(error))
 
@@ -122,11 +108,50 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
 
         if role == QtCore.Qt.DisplayRole:
             return selected_group
+        elif role == QtCore.Qt.CheckStateRole:
+            return QtCore.Qt.Checked if self._selected_groups[index.row()] else QtCore.Qt.Unchecked
         elif role == PigsGroupsModel.PigsPool:
             return groups[selected_group]
         else:
             return QtCore.QVariant()
 
+    def flags(self, index):
+        """
+        """
+
+        default_flags = super(PigsGroupsModel, self).flags(index)
+
+        return QtCore.Qt.ItemIsUserCheckable | default_flags
+
+    def setData(self, index, value, role):
+        """
+        """
+
+        if not index.isValid():
+            return QtCore.QVariant()
+
+        if role == QtCore.Qt.CheckStateRole:
+            self._selected_groups[index.row()] = True if value == QtCore.Qt.Checked else False
+            return True
+
+        return super(PigsGroupsModel, self).setData(index, value, role)
+
     def rowCount(self, parent=None):
+        """
+        """
 
         return len(self._pigs_groups)
+
+    @property
+    def selected_groups(self):
+        """
+        """
+
+        return [group_name for i, group_name in enumerate(self._pigs_groups.groups.keys()) if self._selected_groups[i]]
+
+    @ property
+    def n_selected_groups(self):
+        """
+        """
+
+        return len(self.selected_groups)

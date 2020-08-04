@@ -138,6 +138,25 @@ class PigsGroups:
 
         return p_values
 
+    def evaluate_global_time_effect(self, selected_property='APs', selected_groups=None, interval_indexes=None):
+        """
+        """
+
+        if selected_groups is None:
+            selected_groups = list(self._groups.keys())
+        else:
+            all_groups = set(self._groups.keys())
+            selected_groups = list(all_groups.intersection(selected_groups))
+
+        try:
+            p_values = [self._groups[group].evaluate_global_time_effect(
+                selected_property=selected_property, interval_indexes=interval_indexes) for group in selected_groups]
+        except PigsPoolError as error:
+            logging.error(str(error))
+            return
+
+        return dict(zip(selected_groups, p_values))
+
     def evaluate_pairwise_group_effect(self, selected_property='APs', selected_groups=None, interval_indexes=None):
         """Performs a pairwise statistical test to check whether each pair of groups belongs to the same distribution.
         This should be evaluated only if the number of groups is >= 2.
@@ -178,6 +197,21 @@ class PigsGroups:
                     pairwise_p_values.setdefault(key, []).append(p_values.iloc[i, j])
 
         return pairwise_p_values
+
+    def evaluate_pairwise_time_effect(self, selected_property='APs', selected_groups=None, interval_indexes=None):
+        """
+        """
+
+        if selected_groups is None:
+            selected_groups = list(self._groups.keys())
+        else:
+            all_groups = set(self._groups.keys())
+            selected_groups = list(all_groups.intersection(selected_groups))
+
+        p_values = [self._groups[group].evaluate_pairwise_time_effect(
+            selected_property=selected_property, interval_indexes=interval_indexes) for group in selected_groups]
+
+        return dict(zip(selected_groups, p_values))
 
     def export_statistics(self, filename, selected_property='APs', selected_groups=None, interval_indexes=None):
         """Export basic statistics (average, median, std, quartile ...) for each group and interval to an excel file.
@@ -242,6 +276,20 @@ class PigsGroups:
         """
 
         return self._groups
+
+    def premortem_statistics(self, n_last_intervals, selected_property='APs', selected_groups=None):
+        """
+        """
+
+        if selected_groups is None:
+            selected_groups = list(self._groups.keys())
+        else:
+            all_groups = set(self._groups.keys())
+            selected_groups = list(all_groups.intersection(selected_groups))
+
+        p_values = [self._groups[group].premortem_statistics(n_last_intervals, selected_property=selected_property) for group in selected_groups]
+
+        return dict(zip(selected_groups, p_values))
 
     def set_record_intervals(self, intervals):
         """Set the record intervals.

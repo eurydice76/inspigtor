@@ -33,7 +33,7 @@ class GroupEffectDialog(QtWidgets.QDialog):
         main_layout.addWidget(self._kruskal_canvas)
         main_layout.addWidget(self._kruskal_toolbar)
 
-        if self._groups_model.rowCount() >= 3:
+        if self._groups_model.n_selected_groups >= 3:
 
             main_layout.addWidget(self._kruskal_dunn_canvas)
             main_layout.addWidget(self._kruskal_dunn_toolbar)
@@ -51,7 +51,7 @@ class GroupEffectDialog(QtWidgets.QDialog):
         self._kruskal_canvas = FigureCanvasQTAgg(self._kruskal_figure)
         self._kruskal_toolbar = NavigationToolbarWithExportButton(self._kruskal_canvas, self)
 
-        if self._groups_model.rowCount() >= 3:
+        if self._groups_model.n_selected_groups >= 3:
 
             self._kruskal_dunn_figure = Figure()
             self._kruskal_dunn_axes = self._kruskal_dunn_figure.add_subplot(111)
@@ -78,24 +78,31 @@ class GroupEffectDialog(QtWidgets.QDialog):
         main_window = find_main_window()
         selected_property = main_window.selected_property
 
+        selected_groups = self._groups_model.selected_groups
+
         try:
-            p_values = self._groups_model.evaluate_global_group_effect(selected_property=selected_property)
+            p_values = self._groups_model.evaluate_global_group_effect(selected_property=selected_property, selected_groups=selected_groups)
         except PigsGroupsError as error:
             logging.error(str(error))
             return
 
         self._kruskal_axes.clear()
         self._kruskal_axes.set_xlabel('interval')
-        y_label = 'Kruskal-Wallis' if self._groups_model.rowCount() >= 3 else 'Mann-Whitney'
+        y_label = 'Kruskal-Wallis' if self._groups_model.n_selected_groups >= 3 else 'Mann-Whitney'
         y_label += ' p values'
         self._kruskal_axes.set_ylabel(y_label)
 
-        self._kruskal_axes.plot(range(1, len(p_values)+1), p_values, 'ro')
+        self._kruskal_axes.plot(range(1, len(p_values)+1), p_values, 'bo')
+
+        self._kruskal_axes.axhline(y=0.05, color='r')
+
+        self._kruskal_axes.set_ylim([0, 1])
 
         self._kruskal_canvas.draw()
 
-        if self._groups_model.rowCount() >= 3:
-            pairwise_p_values = self._groups_model.evaluate_pairwise_group_effect(selected_property=selected_property)
+        if self._groups_model.n_selected_groups >= 3:
+            pairwise_p_values = self._groups_model.evaluate_pairwise_group_effect(
+                selected_property=selected_property, selected_groups=selected_groups)
 
             self._kruskal_dunn_axes.clear()
             self._kruskal_dunn_axes.set_xlabel('interval')
@@ -103,6 +110,8 @@ class GroupEffectDialog(QtWidgets.QDialog):
 
             for p_values in pairwise_p_values.values():
                 self._kruskal_dunn_axes.plot(range(1, len(p_values)+1), p_values)
+
+            self._kruskal_dunn_axes.axhline(y=0.05, color='r')
 
             self._kruskal_dunn_axes.legend(pairwise_p_values.keys())
 
