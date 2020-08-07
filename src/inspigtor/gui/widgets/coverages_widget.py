@@ -3,10 +3,13 @@
 
 from PyQt5 import QtWidgets
 
+import matplotlib.ticker as ticker
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
+from inspigtor.gui.utils.helper_functions import func_formatter
 from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
+from inspigtor.kernel.utils.helper_functions import build_timeline
 
 
 class CoveragesWidget(QtWidgets.QWidget):
@@ -16,11 +19,9 @@ class CoveragesWidget(QtWidgets.QWidget):
     A ratio of 1 indicates that all values could be successfully casted to a float.
     """
 
-    def __init__(self, pigs_model, parent=None):
+    def __init__(self, parent=None):
 
         super(CoveragesWidget, self).__init__(parent)
-
-        self._pigs_model = pigs_model
 
         self.init_ui()
 
@@ -64,13 +65,23 @@ class CoveragesWidget(QtWidgets.QWidget):
             coverages (list): the coverages values to plot
         """
 
+        if not coverages:
+            return
+
         n_intervals = len(coverages)
 
+        x = range(0, n_intervals)
+        interval_data = self.parent().interval_settings_label.data()
+
+        tick_labels = range(1, n_intervals+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), x)
+
         self._axes.clear()
-        self._axes.plot(range(1, n_intervals+1), coverages)
-        self._axes.set_xticks(range(1, n_intervals+1))
-        self._axes.set_xticklabels(range(1, n_intervals+1))
+        self._axes.plot(x, coverages)
         self._axes.set_xlabel('interval')
+        self._axes.xaxis.set_minor_locator(ticker.AutoLocator())
+        self._axes.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda tick_val, tick_pos: func_formatter(tick_val, tick_pos, tick_labels)))
+        self._axes.xaxis.set_major_locator(ticker.IndexLocator(base=10.0, offset=0.0))
+        self._axes.xaxis.set_major_formatter(ticker.FuncFormatter(lambda tick_val, tick_pos: func_formatter(tick_val, tick_pos, tick_labels)))
         self._axes.set_ylabel('coverage')
 
         self._canvas.draw()

@@ -2,11 +2,14 @@ import logging
 
 from PyQt5 import QtCore, QtWidgets
 
+import matplotlib.ticker as ticker
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
+from inspigtor.gui.utils.helper_functions import find_main_window, func_formatter
 from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
 from inspigtor.kernel.pigs.pigs_pool import PigsPoolError
+from inspigtor.kernel.utils.helper_functions import build_timeline
 
 
 class GroupAveragesDialog(QtWidgets.QDialog):
@@ -107,14 +110,19 @@ class GroupAveragesDialog(QtWidgets.QDialog):
                 continue
 
             try:
-                temp = pigs_pool.get_averages_per_interval(self._selected_property)
+                reduced_averages = pigs_pool.reduced_statistics(self._selected_property, selected_statistics='mean', output_statistics=['mean', 'std'])
             except PigsPoolError as error:
                 logging.error(str(error))
                 return
 
-            averages, stds = temp
+            x = range(0, len(reduced_averages['mean']))
+            main_window = find_main_window()
+            interval_data = main_window.intervals_widget.interval_settings_label.data()
+            tick_labels = range(1, len(x)+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), x)
 
-            self._axes.errorbar(range(1, len(averages)+1), averages, yerr=stds, fmt='o')
+            self._axes.errorbar(x, reduced_averages['mean'], yerr=reduced_averages['std'], fmt='o')
+            self._axes.xaxis.set_major_locator(ticker.IndexLocator(base=10.0, offset=0.0))
+            self._axes.xaxis.set_major_formatter(ticker.FuncFormatter(lambda tick_val, tick_pos: func_formatter(tick_val, tick_pos, tick_labels)))
 
         group_names = self._groups_model.pigs_groups.groups.keys()
 

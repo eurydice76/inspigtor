@@ -44,17 +44,21 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
         """
         """
 
-        p_values = self._pigs_groups.evaluate_global_group_effect(selected_property=selected_property, selected_groups=selected_groups)
+        intervals, p_values, n_groups = self._pigs_groups.evaluate_global_group_effect(selected_property=selected_property, selected_groups=selected_groups)
 
-        return p_values
+        return intervals, p_values, n_groups
 
     def evaluate_pairwise_group_effect(self, selected_property='APs', selected_groups=None):
         """
         """
 
-        p_values = self._pigs_groups.evaluate_pairwise_group_effect(selected_property=selected_property, selected_groups=selected_groups)
-
-        return p_values
+        try:
+            p_values = self._pigs_groups.evaluate_pairwise_group_effect(
+                selected_property=selected_property, selected_groups=selected_groups)
+        except PigsGroupsError:
+            return None
+        else:
+            return p_values
 
     def evaluate_global_time_effect(self, selected_property='APs', selected_groups=None):
         """
@@ -92,6 +96,10 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
             logging.error(str(error))
 
         self.endInsertRows()
+
+    def get_group(self, group):
+
+        return self._pigs_groups.get_group(group)
 
     def data(self, index, role):
         """

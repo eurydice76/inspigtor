@@ -45,6 +45,7 @@ class StatisticsWidget(QtWidgets.QWidget):
         self._main_window.display_premortem_statistics.connect(self.on_display_premortem_statistics)
         self._main_window.export_group_statistics.connect(self.on_export_group_statistics)
         self._main_window.display_group_medians.connect(self.on_display_group_medians)
+        self._main_window.import_groups_from_directories.connect(self.on_import_groups)
 
     def build_layout(self):
         """Build the layout.
@@ -222,6 +223,16 @@ class StatisticsWidget(QtWidgets.QWidget):
         except PigsGroupsError as error:
             logging.error(str(error))
             return
+
+    def on_import_groups(self, groups):
+        """Event fired when the user click on Groups -> Import from directories menu button.
+        """
+
+        for group, files in groups.items():
+            self.on_add_group(group)
+            for filename in files:
+                pigs_pool = self._groups_list.model().get_group(group)
+                pigs_pool.add_reader(self._pigs_model.get_reader(filename))
 
     def on_select_group(self, index):
         """Updates the individuals list view.

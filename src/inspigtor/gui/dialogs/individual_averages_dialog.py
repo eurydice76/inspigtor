@@ -4,11 +4,14 @@ import numpy as np
 
 from PyQt5 import QtCore, QtWidgets
 
+import matplotlib.ticker as ticker
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
+from inspigtor.gui.utils.helper_functions import find_main_window, func_formatter
 from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
 from inspigtor.kernel.readers.picco2_reader import PiCCO2FileReaderError
+from inspigtor.kernel.utils.helper_functions import build_timeline
 
 
 class IndividualAveragesDialog(QtWidgets.QDialog):
@@ -88,7 +91,7 @@ class IndividualAveragesDialog(QtWidgets.QDialog):
         index = self._pigs_model.index(row)
         reader = self._pigs_model.data(index, self._pigs_model.Reader)
         try:
-            individual_averages = reader.get_descriptive_statistics(self._selected_property)
+            individual_averages = reader.get_descriptive_statistics(self._selected_property, selected_statistics=['mean', 'std'])
         except PiCCO2FileReaderError as error:
             logging.error(str(error))
             return
@@ -96,8 +99,8 @@ class IndividualAveragesDialog(QtWidgets.QDialog):
         xs = []
         averages = []
         stds = []
-        for interval, average, std in zip(individual_averages['intervals'], individual_averages['averages'], individual_averages['stddevs']):
-            xs.append(interval+1)
+        for interval, average, std in zip(individual_averages['intervals'], individual_averages['mean'], individual_averages['std']):
+            xs.append(interval)
             averages.append(average)
             stds.append(std)
 
@@ -110,6 +113,12 @@ class IndividualAveragesDialog(QtWidgets.QDialog):
         self._axes.set_xlabel('interval')
         self._axes.set_ylabel(self._selected_property)
 
+        main_window = find_main_window()
+        interval_data = main_window.intervals_widget.interval_settings_label.data()
+        tick_labels = range(1, len(xs)+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), xs)
+
         self._plot = self._axes.errorbar(xs, averages, yerr=stds, fmt='ro')
+        self._axes.xaxis.set_major_locator(ticker.IndexLocator(base=10.0, offset=0.0))
+        self._axes.xaxis.set_major_formatter(ticker.FuncFormatter(lambda tick_val, tick_pos: func_formatter(tick_val, tick_pos, tick_labels)))
 
         self._canvas.draw()

@@ -1,14 +1,18 @@
 import logging
+import os
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 
+import xlsxwriter
+
 from inspigtor.gui.dialogs.dunn_matrix_dialog import DunnMatrixDialog
 from inspigtor.gui.models.pvalues_data_model import PValuesDataModel
 from inspigtor.gui.utils.helper_functions import find_main_window
 from inspigtor.gui.widgets.copy_pastable_tableview import CopyPastableTableView
+from inspigtor.kernel.utils.helper_functions import build_timeline
 
 
 class TimeEffectDialog(QtWidgets.QDialog):
@@ -30,7 +34,6 @@ class TimeEffectDialog(QtWidgets.QDialog):
         """
 
         self._dunn_table.customContextMenuRequested.connect(self.on_show_dunn_table_menu)
-        self._selected_group_combo.currentIndexChanged.connect(self.on_select_group)
 
     def build_layout(self):
         """Build the layout.
@@ -74,10 +77,6 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         self._selected_group_combo = QtWidgets.QComboBox()
 
-        selected_groups = self._groups_model.selected_groups
-
-        self._selected_group_combo.addItems(selected_groups)
-
         self._dunn_table = CopyPastableTableView()
         self._dunn_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self._dunn_table.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
@@ -87,29 +86,38 @@ class TimeEffectDialog(QtWidgets.QDialog):
         """Display the global time effect and the pairwise time effect.
         """
 
+        self._friedman_axes.clear()
+        self._friedman_axes.set_xlabel('groups')
+        self._friedman_axes.set_ylabel('Friedman p values')
+
         main_window = find_main_window()
 
         selected_property = main_window.selected_property
 
         selected_groups = self._groups_model.selected_groups
 
-        p_values = self._groups_model.evaluate_global_time_effect(selected_property=selected_property, selected_groups=selected_groups)
+        valid_groups, p_values = self._groups_model.evaluate_global_time_effect(
+            selected_property=selected_property, selected_groups=selected_groups)
         if not p_values:
             return
 
-        self._friedman_axes.clear()
-        self._friedman_axes.set_xlabel('groups')
-        self._friedman_axes.set_ylabel('Friedman p values')
-
         self._friedman_axes.axhline(y=0.05, color='r')
 
-        self._friedman_axes.bar(p_values.keys(), p_values.values())
+        self._friedman_axes.bar(valid_groups, p_values)
 
         self._friedman_canvas.draw()
 
-        self._pairwise_p_values = self._groups_model.evaluate_pairwise_time_effect(
+        valid_groups, valid_intervals, pairwise_p_values = self._groups_model.evaluate_pairwise_time_effect(
             selected_property=selected_property, selected_groups=selected_groups)
+        if not pairwise_p_values:
+            return
 
+        self._selected_group_combo.clear()
+        self._selected_group_combo.addItems(valid_groups)
+        for i, p_values in enumerate(pairwise_p_values):
+            self._selected_group_combo.setItemData(i, (valid_intervals[i], p_values))
+
+        self._selected_group_combo.currentIndexChanged.connect(self.on_select_group)
         self.on_select_group(0)
 
     def init_ui(self):
@@ -132,23 +140,16 @@ class TimeEffectDialog(QtWidgets.QDialog):
         if model is None:
             return
 
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Export table as ...')
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Export statistics as ...', filter="Excel files (*.xls *.xlsx)")
         if not filename:
             return
 
-        try:
-            with open(filename, 'w') as fout:
-                for i in range(model.rowCount()):
-                    line = []
-                    for j in range(model.columnCount()):
-                        index = model.index(i, j)
-                        data = model.data(index, QtCore.Qt.DisplayRole)
-                        line.append(data)
-                    line = ';'.join(line)
-                    fout.write(line)
-                    fout.write('\n')
-        except PermissionError:
-            logging.error('Can not open file {} for writing.'.format(filename))
+        filename_noext, ext = os.path.splitext(filename)
+        if ext not in ['.xls', '.xlsx']:
+            logging.warning('Bad file extension for output excel file {}. It will be replaced by ".xlsx"'.format(filename))
+            filename = filename_noext + '.xlsx'
+
+        model.export(filename)
 
     def on_select_group(self, selected_group):
         """Event fired when the user change of group for showing the corresponding Dunn matrix.
@@ -157,19 +158,14 @@ class TimeEffectDialog(QtWidgets.QDialog):
             selected_group (int): the selected group
         """
 
-        if not self._pairwise_p_values:
-            return
+        valid_intervals, p_values = self._selected_group_combo.itemData(selected_group)
 
-        selected_group = self._selected_group_combo.itemText(selected_group)
-        if selected_group not in self._pairwise_p_values:
-            return
+        main_window = find_main_window()
+        interval_data = main_window.intervals_widget.interval_settings_label.data()
+        labels = range(1, len(valid_intervals)+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), valid_intervals)
 
-        p_values = self._pairwise_p_values[selected_group]
-
-        # p_values is a squared data frame
-        n_rows, n_cols = p_values.shape
-        p_values.index = range(1, n_rows+1)
-        p_values.columns = range(1, n_cols+1)
+        p_values.index = labels
+        p_values.columns = labels
 
         model = PValuesDataModel(p_values)
 

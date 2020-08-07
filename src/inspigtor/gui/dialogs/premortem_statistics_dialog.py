@@ -9,6 +9,7 @@ from inspigtor.gui.dialogs.dunn_matrix_dialog import DunnMatrixDialog
 from inspigtor.gui.models.pvalues_data_model import PValuesDataModel
 from inspigtor.gui.utils.helper_functions import find_main_window
 from inspigtor.gui.widgets.copy_pastable_tableview import CopyPastableTableView
+from inspigtor.kernel.utils.helper_functions import build_timeline
 
 
 class PreMortemStatisticsDialog(QtWidgets.QDialog):
@@ -91,8 +92,7 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
 
         self._selected_group_combo = QtWidgets.QComboBox()
 
-        selected_groups = [self._groups_model.data(self._groups_model.index(row), QtCore.Qt.DisplayRole)
-                           for row in range(self._groups_model.rowCount())]
+        selected_groups = self._groups_model.selected_groups
 
         self._selected_group_combo.addItems(selected_groups)
 
@@ -117,8 +117,9 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
 
         p_values = self._groups_model.premortem_statistics(n_last_intervals, selected_property=selected_property, selected_groups=selected_groups)
 
-        self._friedman_p_values = dict(zip(p_values.keys(), [v[0] for v in p_values.values()]))
-        self._dunn_p_values = dict(zip(p_values.keys(), [v[1] for v in p_values.values()]))
+        self._interval_indexes = dict(zip(p_values.keys(), [v[0] for v in p_values.values()]))
+        self._friedman_p_values = dict(zip(p_values.keys(), [v[1] for v in p_values.values()]))
+        self._dunn_p_values = dict(zip(p_values.keys(), [v[2] for v in p_values.values()]))
 
         self.display_time_effect()
 
@@ -189,11 +190,17 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
             return
 
         p_values = self._dunn_p_values[selected_group]
+        # p_values is a squared data frame
+        n_rows, n_cols = p_values.shape
+
+        main_window = find_main_window()
+        interval_data = main_window.intervals_widget.interval_settings_label.data()
+        labels = range(1, n_rows+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), self._interval_indexes[selected_group])
 
         # p_values is a squared data frame
         n_rows, n_cols = p_values.shape
-        p_values.index = range(1, n_rows+1)
-        p_values.columns = range(1, n_cols+1)
+        p_values.index = labels
+        p_values.columns = labels
 
         model = PValuesDataModel(p_values)
 

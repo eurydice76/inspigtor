@@ -1,9 +1,15 @@
 import logging
 
+import numpy as np
+
 from PyQt5 import QtCore, QtWidgets
 
+import matplotlib.ticker as ticker
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+
+from inspigtor.gui.utils.helper_functions import find_main_window, func_formatter
+from inspigtor.kernel.utils.helper_functions import build_timeline
 
 
 class GroupMediansDialog(QtWidgets.QDialog):
@@ -90,8 +96,7 @@ class GroupMediansDialog(QtWidgets.QDialog):
             return
 
         individual_averages = pigs_pool.get_statistics(self._selected_property)
-        if individual_averages is None:
-            return
+        individual_averages = [[v for v in row if not np.isnan(v)] for row in individual_averages]
 
         # If there is already a plot, remove it
         if hasattr(self, '_axes'):
@@ -102,6 +107,13 @@ class GroupMediansDialog(QtWidgets.QDialog):
         self._axes.set_xlabel('interval')
         self._axes.set_ylabel(self._selected_property)
 
+        x = range(len(individual_averages))
+        main_window = find_main_window()
+        interval_data = main_window.intervals_widget.interval_settings_label.data()
+        tick_labels = range(1, len(x)+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), x)
+
         self._plot = self._axes.boxplot(individual_averages, showfliers=False)
+        self._axes.xaxis.set_major_locator(ticker.IndexLocator(base=10.0, offset=0.0))
+        self._axes.xaxis.set_major_formatter(ticker.FuncFormatter(lambda tick_val, tick_pos: func_formatter(tick_val, tick_pos, tick_labels)))
 
         self._canvas.draw()

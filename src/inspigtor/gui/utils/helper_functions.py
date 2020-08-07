@@ -25,3 +25,11 @@ def debug_trace():
 
     QtCore.pyqtRemoveInputHook()
     set_trace()
+
+
+def func_formatter(tick_val, tick_pos, labels):
+    int_tick_val = int(round(tick_val))
+    if int_tick_val in range(len(labels)):
+        return labels[int_tick_val]
+    else:
+        return ''

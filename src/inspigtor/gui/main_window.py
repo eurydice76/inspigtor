@@ -1,3 +1,4 @@
+import collections
 import glob
 import logging
 import os
@@ -18,6 +19,7 @@ from inspigtor.gui.widgets.logger_widget import QTextEditLogger
 from inspigtor.gui.widgets.multiple_directories_selector import MultipleDirectoriesSelector
 from inspigtor.gui.widgets.statistics_widget import StatisticsWidget
 from inspigtor.kernel.readers.picco2_reader import PiCCO2FileReader, PiCCO2FileReaderError
+from inspigtor.kernel.utils.progress_bar import progress_bar
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -39,6 +41,8 @@ class MainWindow(QtWidgets.QMainWindow):
     export_group_statistics = QtCore.pyqtSignal()
 
     display_group_medians = QtCore.pyqtSignal()
+
+    import_groups_from_directories = QtCore.pyqtSignal(dict)
 
     def __init__(self, parent=None):
         """Constructor.
@@ -126,6 +130,12 @@ class MainWindow(QtWidgets.QMainWindow):
         add_group_action.triggered.connect(self.on_add_new_group)
         group_menu.addAction(add_group_action)
 
+        import_groups_action = QtWidgets.QAction('&Import from directories', self)
+        import_groups_action.setShortcut('Ctrl+U')
+        import_groups_action.setStatusTip('Import and create groups from a list of directories')
+        import_groups_action.triggered.connect(self.on_import_groups_from_directories)
+        group_menu.addAction(import_groups_action)
+
         group_menu.addSeparator()
 
         display_group_averages_action = QtWidgets.QAction('&Display averages', self)
@@ -195,7 +205,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setCentralWidget(self._main_frame)
 
-        self.setGeometry(0, 0, 1200, 1000)
+        self.setGeometry(0, 0, 1200, 1100)
 
         self.setWindowTitle("inspigtor {}".format(__version__))
 
@@ -214,6 +224,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._progress_label = QtWidgets.QLabel('Progress')
         self._progress_bar = QtWidgets.QProgressBar()
+        progress_bar.set_progress_widget(self._progress_bar)
         self.statusBar().showMessage("inspigtor {}".format(__version__))
         self.statusBar().addPermanentWidget(self._progress_label)
         self.statusBar().addPermanentWidget(self._progress_bar)
@@ -222,16 +233,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowIcon(QtGui.QIcon(icon_path))
 
         self.show()
-
-    def init_progress_bar(self, n_steps):
-        """Initializes the progress bar.
-
-        Args:
-            n_steps (int): the total number of steps of the task to monitor
-        """
-
-        self._progress_bar.setMinimum(0)
-        self._progress_bar.setMaximum(n_steps)
 
     def init_ui(self):
         """Initializes the ui.
@@ -246,6 +247,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.build_menu()
 
         self.build_events()
+
+    @property
+    def intervals_widget(self):
+
+        return self._intervals_widget
 
     def on_add_new_group(self):
         """Event fired when the user clicks on 'Add group' menu button.
@@ -303,6 +309,55 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.export_group_statistics.emit()
 
+    def on_import_groups_from_directories(self):
+        """Event fired when the user clicks on Groups -> Import from directories menu button.
+        """
+
+        # Pop up a file browser
+        selector = MultipleDirectoriesSelector()
+        if not selector.exec_():
+            return
+
+        experimental_dirs = selector.selectedFiles()
+        if not experimental_dirs:
+            return
+
+        pigs_model = self._pigs_list.model()
+
+        progress_bar.reset(len(experimental_dirs))
+
+        n_loaded_dirs = 0
+
+        groups = collections.OrderedDict()
+
+        # Loop over the pig directories
+        for progress, exp_dir in enumerate(experimental_dirs):
+
+            data_files = glob.glob(os.path.join(exp_dir, '*.csv'))
+
+            # Loop over the Data*csv csv files found in the current oig directory
+            for data_file in data_files:
+                try:
+                    reader = PiCCO2FileReader(data_file)
+                except PiCCO2FileReaderError as error:
+                    logging.error(str(error))
+                    continue
+                else:
+                    pigs_model.add_reader(reader)
+                    groups.setdefault(os.path.basename(exp_dir), []).append(data_file)
+
+            n_loaded_dirs += 1
+            progress_bar.update(progress+1)
+
+        # Create a signal/slot connexion for row changed event
+        self._pigs_list.selectionModel().currentChanged.connect(self.on_select_pig)
+
+        self._pigs_list.setCurrentIndex(pigs_model.index(0, 0))
+
+        self.import_groups_from_directories.emit(groups)
+
+        logging.info('Imported successfully {} groups out of {} directories'.format(n_loaded_dirs, len(experimental_dirs)))
+
     def on_load_experiment_data(self):
         """Event fired when the user loads expriment data by clicking on File -> Open or double clicking on the data list view when it is empty.
         """
@@ -315,7 +370,7 @@ class MainWindow(QtWidgets.QMainWindow):
         pigs_model = self._pigs_list.model()
 
         n_csv_files = len(csv_files)
-        self.init_progress_bar(n_csv_files)
+        progress_bar.reset(n_csv_files)
 
         n_loaded_files = 0
 
@@ -325,18 +380,23 @@ class MainWindow(QtWidgets.QMainWindow):
             if pigs_model.get_pig(csv_file) is not None:
                 continue
 
-            reader = PiCCO2FileReader(csv_file)
-            pigs_model.add_reader(reader)
-
-            n_loaded_files += 1
-            self.update_progress_bar(progress+1)
+            try:
+                reader = PiCCO2FileReader(csv_file)
+            except PiCCO2FileReaderError as error:
+                logging.error(str(error))
+                continue
+            else:
+                pigs_model.add_reader(reader)
+                n_loaded_files += 1
+            finally:
+                progress_bar.update(progress+1)
 
         # Create a signal/slot connexion for row changed event
         self._pigs_list.selectionModel().currentChanged.connect(self.on_select_pig)
 
         self._pigs_list.setCurrentIndex(pigs_model.index(0, 0))
 
-        logging.info('Loaded successfully {} files over {}'.format(n_loaded_files, n_csv_files))
+        logging.info('Loaded successfully {} files out of {}'.format(n_loaded_files, n_csv_files))
 
     def on_load_experimental_dirs(self):
         """Opens several experimental directories.
@@ -353,11 +413,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         pigs_model = self._pigs_list.model()
 
-        self.init_progress_bar(len(experimental_dirs))
+        progress_bar.reset(len(experimental_dirs))
 
-        filenames = []
-
-        n_loaded_files = 0
+        n_loaded_dirs = 0
 
         # Loop over the pig directories
         for progress, exp_dir in enumerate(experimental_dirs):
@@ -366,20 +424,23 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # Loop over the Data*csv csv files found in the current oig directory
             for data_file in data_files:
-                reader = PiCCO2FileReader(data_file)
-                pigs_model.add_reader(reader)
+                try:
+                    reader = PiCCO2FileReader(data_file)
+                except PiCCO2FileReaderError as error:
+                    logging.error(str(error))
+                    continue
+                else:
+                    pigs_model.add_reader(reader)
 
-                filenames.append(data_file)
-
-            n_loaded_files += 1
-            self.update_progress_bar(progress+1)
+            n_loaded_dirs += 1
+            progress_bar.update(progress+1)
 
         # Create a signal/slot connexion for row changed event
         self._pigs_list.selectionModel().currentChanged.connect(self.on_select_pig)
 
         self._pigs_list.setCurrentIndex(pigs_model.index(0, 0))
 
-        logging.info('Loaded successfully {} files over {}'.format(n_loaded_files, len(experimental_dirs)))
+        logging.info('Loaded successfully {} directories out of {}'.format(n_loaded_dirs, len(experimental_dirs)))
 
     def on_plot_property(self, checked, selected_property):
         """Plot one property of the PiCCO file.
@@ -570,12 +631,3 @@ class MainWindow(QtWidgets.QMainWindow):
     def selected_property(self):
 
         return self._selected_property_combo.currentText()
-
-    def update_progress_bar(self, step):
-        """Updates the progress bar.
-
-        Args:
-            step (int): the step
-        """
-
-        self._progress_bar.setValue(step)

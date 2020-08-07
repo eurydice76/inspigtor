@@ -48,11 +48,10 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
     """This class implements the dialog used to set up a new interval.
 
     An interval is the entity used to define record intervals from a given PiCCO2 reader.
-    It is stored internally as a 4-tuples of the form (start,end,record,offset) where:
+    It is stored internally as a 4-tuples of the form (start,end,record) where:
         - start is the starting time of the interval starting from t0 - 10 minutes time origin
         - end is the ending time of the interval starting from t0 - 10 minutes time origin
-        - record is the length in seconds of the records interval that should be search in the full interval
-        - offset is the length in seconds of the offset interval where the records will not be taken into account 
+        - record is the length in minutes of the records interval that should be search in the full interval
     """
 
     def __init__(self, *args, **kwargs):
@@ -82,7 +81,6 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
         layout.addRow(self._start_label, self._start_line_edit)
         layout.addRow(self._end_label, self._end_line_edit)
         layout.addRow(self._record_label, self._record_spinbox)
-        layout.addRow(self._offset_label, self._offset_spinbox)
 
         self._form_group_box.setLayout(layout)
 
@@ -99,7 +97,6 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
         self._start_label = QtWidgets.QLabel('Start (H:M:S)')
         self._end_label = QtWidgets.QLabel('End (H:M:S)')
         self._record_label = QtWidgets.QLabel('Record (min)')
-        self._offset_label = QtWidgets.QLabel('Offset (min)')
 
         validator = TimeValidator()
 
@@ -114,26 +111,20 @@ class IntervalSettingsDialog(QtWidgets.QDialog):
         self._record_spinbox.setMaximum(20000)
         self._record_spinbox.setValue(2)
 
-        self._offset_spinbox = QtWidgets.QSpinBox()
-        self._offset_spinbox.setMinimum(0)
-        self._offset_spinbox.setMaximum(20000)
-        self._offset_spinbox.setValue(0)
-
         self._button_box = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
 
     def value(self):
         """Return the interval stored in the dialog.
 
         Returns:
-            4-tuple: the interval stored in the form (starting, ending, record, offset)
+            str: the interval stored in the form 'starting:ending:record'
         """
 
         start = self._start_line_edit.text()
         end = self._end_line_edit.text()
-        record = self._record_spinbox.value()
-        offset = self._offset_spinbox.value()
+        record = str(self._record_spinbox.value())
 
-        return (start, end, record, offset)
+        return (start, end, record)
 
     def init_ui(self):
         """Initializes the ui.

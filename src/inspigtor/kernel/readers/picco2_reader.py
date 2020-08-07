@@ -4,13 +4,13 @@ import logging
 import os
 import sys
 
-import numpy as np
-
-import scipy.stats as stats
-
 import xlsxwriter
 
+import numpy as np
+
 import pandas as pd
+
+from inspigtor.kernel.utils.stats import statistical_functions
 
 
 class PiCCO2FileReaderError(Exception):
@@ -181,7 +181,7 @@ class PiCCO2FileReader:
 
         return coverages
 
-    def get_descriptive_statistics(self, selected_property='APs', interval_indexes=None):
+    def get_descriptive_statistics(self, selected_property='APs', selected_statistics=None, interval_indexes=None):
         """Compute the statistics for a given property for the current record intervals.
 
         For each record interval, computes the average and the standard deviation of the selected property.
@@ -194,6 +194,15 @@ class PiCCO2FileReader:
             dict: a dictionary whose keys are the different statistics computed (e;g; average, median ...) and the values are the list of 
             the value of the statistics over record intervals
         """
+
+        if selected_statistics is None:
+            selected_statistics = list(statistical_functions.keys())
+        else:
+            all_statistics = set(statistical_functions.keys())
+            selected_statistics = list(all_statistics.intersection(selected_statistics))
+
+        if not selected_statistics:
+            raise PiCCO2FileReaderError('Invalid input statistics')
 
         if selected_property not in list(self._data.columns):
             raise PiCCO2FileReaderError('Property {} is unknown'.format(selected_property))
@@ -218,18 +227,16 @@ class PiCCO2FileReader:
                 except ValueError:
                     continue
 
+            statistics.setdefault('intervals', []).append(index)
+
             if not data:
-                raise PiCCO2FileReaderError('The interval {:d} of file {} does not contain any number'.format(index+1, self._filename))
+                statistics.setdefault('data', []).append(None)
+                for stat in selected_statistics:
+                    statistics.setdefault(stat, []).append(np.nan)
             else:
-                statistics.setdefault('intervals', []).append(index+1)
                 statistics.setdefault('data', []).append(data)
-                statistics.setdefault('averages', []).append(np.average(data))
-                statistics.setdefault('stddevs', []).append(np.std(data))
-                statistics.setdefault('medians', []).append(np.median(data))
-                statistics.setdefault('1st quantiles', []).append(np.quantile(data, 0.25))
-                statistics.setdefault('3rd quantiles', []).append(np.quantile(data, 0.75))
-                statistics.setdefault('skewnesses', []).append(stats.skew(data))
-                statistics.setdefault('kurtosis', []).append(stats.kurtosis(data))
+                for stat in selected_statistics:
+                    statistics.setdefault(stat, []).append(statistical_functions[stat](data))
 
         return statistics
 
@@ -244,11 +251,11 @@ class PiCCO2FileReader:
 
         return len(self._data['Time'])
 
-    def set_record_intervals(self, intervals):
+    def set_record_interval(self, interval):
         """Set the record intervals.
 
         Args:
-            intervals (list of 4-tuples): the record intervals. List of 4-tuples of the form (start,end,record,offset).
+            3-tuples: the record interval. 4-tuple of the form (start,end,record).
         """
 
         t_max = self.get_t_final_index()
@@ -257,59 +264,59 @@ class PiCCO2FileReader:
 
         self._record_intervals = []
 
-        # Loop over each interval
-        for interval in intervals:
-            start, end, record, offset = interval
-            # The record and offset are converted from minutes to seconds
-            record *= 60
-            offset *= 60
-            # Convert strptime to timedelta for further use
-            start = (datetime.strptime(start, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
-            end = (datetime.strptime(end, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
+        start, end, record = interval
 
-            enter_interval = True
-            exit_interval = True
-            last_record_index = None
-            # Loop over the times [t0-10,end] for defining the first and last indexes (included) that falls in the running interval
-            for t_index in range(self._t_minus_10_index, t_max):
-                delta_t = (datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt) - t_minus_10).seconds
-                # We have not entered yet in the interval, skip.
-                if delta_t < start:
-                    continue
-                # We entered in the interval.
+        self._record = int(record)
+
+        # The record is converted from minutes to seconds
+        self._record *= 60
+        # Convert strptime to timedelta for further use
+        start = (datetime.strptime(start, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
+        end = (datetime.strptime(end, self._time_fmt) - datetime.strptime('00:00:00', self._time_fmt)).seconds
+
+        enter_interval = True
+        exit_interval = True
+        last_record_index = None
+        # Loop over the times [t0-10,end] for defining the first and last indexes (included) that falls in the running interval
+        for t_index in range(self._t_minus_10_index, t_max):
+            delta_t = (datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt) - t_minus_10).seconds
+            # We have not entered yet in the interval, skip.
+            if delta_t < start:
+                continue
+            # We entered in the interval.
+            else:
+                # We are in the interval
+                if delta_t < end:
+                    # First time we entered in the interval, record the corresponding index
+                    if enter_interval:
+                        first_record_index = t_index
+                        enter_interval = False
+                # We left the interval
                 else:
-                    # We are in the interval
-                    if delta_t < end:
-                        # First time we entered in the interval, record the corresponding index
-                        if enter_interval:
-                            first_record_index = t_index
-                            enter_interval = False
-                    # We left the interval
-                    else:
-                        # First time we left the interval, record the corresponding index
-                        if exit_interval:
-                            last_record_index = t_index
-                            exit_interval = False
+                    # First time we left the interval, record the corresponding index
+                    if exit_interval:
+                        last_record_index = t_index
+                        exit_interval = False
 
-            # If the last index could not be defined, set it to the last index of the data
-            if last_record_index is None:
-                last_record_index = len(self._data.index)
+        # If the last index could not be defined, set it to the last index of the data
+        if last_record_index is None:
+            last_record_index = len(self._data.index)
 
-            starting_index = first_record_index
-            delta_ts = []
-            for t_index in range(first_record_index, last_record_index):
-                t0 = datetime.strptime(self._data['Time'].iloc[starting_index], self._time_fmt)
-                t1 = datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt)
-                delta_t = (t1 - t0).seconds
-                delta_ts.append((t_index, delta_t))
+        starting_index = first_record_index
+        delta_ts = []
+        for t_index in range(first_record_index, last_record_index):
+            t0 = datetime.strptime(self._data['Time'].iloc[starting_index], self._time_fmt)
+            t1 = datetime.strptime(self._data['Time'].iloc[t_index], self._time_fmt)
+            delta_t = (t1 - t0).seconds
+            delta_ts.append((t_index, delta_t))
 
-                if delta_t > record + offset:
-                    for r_index, delta_t in delta_ts:
-                        if delta_t > record:
-                            self._record_intervals.append((starting_index, r_index))
-                            break
-                    starting_index = t_index
-                    delta_ts = []
+            if delta_t > self._record:
+                for r_index, delta_t in delta_ts:
+                    if delta_t > self._record:
+                        self._record_intervals.append((starting_index, r_index))
+                        break
+                starting_index = t_index
+                delta_ts = []
 
     @ property
     def parameters(self):
@@ -366,6 +373,8 @@ class PiCCO2FileReader:
 
         for index, (_, ending) in enumerate(record_times):
             delta_t = datetime.strptime(time, self._time_fmt) - datetime.strptime(ending, self._time_fmt)
+            if delta_t.seconds == 0:
+                return index
             if delta_t.days < 0:
                 return index
 
@@ -423,8 +432,7 @@ class PiCCO2FileReader:
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    reader.set_record_intervals([('00:00:00', '6:15:00', 5, 0)])
-    print(reader.record_intervals)
+    reader.set_record_interval(('00:00:00', '6:15:00', 2))
     print(reader.record_times)
     print(reader.t_initial_interval_index)
     print(reader.get_t_final_index())
