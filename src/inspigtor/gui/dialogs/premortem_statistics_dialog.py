@@ -1,3 +1,7 @@
+"""This module implements the following class:
+    - PreMortemStatisticsDialog
+"""
+
 import logging
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -13,7 +17,7 @@ from inspigtor.kernel.utils.helper_functions import build_timeline
 
 
 class PreMortemStatisticsDialog(QtWidgets.QDialog):
-    """
+    """This class implements the dialog for premortem analysis.
     """
 
     def __init__(self, groups_model, parent=None):
