@@ -1,9 +1,7 @@
 import collections
-import copy
 import logging
-import string
 
-import xlsxwriter
+import openpyxl
 
 import numpy as np
 
@@ -12,7 +10,6 @@ import scipy.stats as stats
 import scikit_posthocs as sk
 
 from inspigtor.kernel.pigs.pigs_pool import PigsPoolError
-from inspigtor.kernel.readers.picco2_reader import PiCCO2FileReaderError
 from inspigtor.kernel.utils.stats import statistical_functions
 from inspigtor.kernel.utils.progress_bar import progress_bar
 
@@ -302,9 +299,7 @@ class PigsGroups:
             all_groups = set(self._groups.keys())
             selected_groups = list(all_groups.intersection(selected_groups))
 
-        alphabet = list(string.ascii_uppercase)
-
-        workbook = xlsxwriter.Workbook(filename)
+        workbook = openpyxl.Workbook()
         for group in selected_groups:
 
             try:
@@ -315,27 +310,32 @@ class PigsGroups:
                 return
 
             # Create the excel worksheet
-            worksheet = workbook.add_worksheet(group)
+            workbook.create_sheet(group)
+            worksheet = workbook.get_sheet_by_name(group)
 
-            worksheet.write('A1', 'interval')
-            worksheet.write('L1', 'selected property')
-            worksheet.write('L2', selected_property)
-            worksheet.write('N1', 'pigs')
+            worksheet.cell(row=1, column=1).value = 'interval'
+            worksheet.cell(row=1, column=12).value = 'selected property'
+            worksheet.cell(row=2, column=12).value = selected_property
+            worksheet.cell(row=1, column=14).value = 'pigs'
 
             # Add titles
             for col, func in enumerate(statistical_functions.keys()):
-                worksheet.write('{}1'.format(alphabet[col+1]), func)
+                worksheet.cell(row=1, column=col+1).value = func
 
                 for row, value in enumerate(reduced_averages[func]):
 
-                    worksheet.write('A{}'.format(row+2), row+1)
-                    worksheet.write('{}{}'.format(alphabet[col+1], row+2), value)
+                    worksheet.cell(row=row+2, column=1).value = row+1
+                    worksheet.cell(row=row+2, column=col+1).value = value
 
             pigs = self._groups[group].pigs.keys()
             for row, pig in enumerate(pigs):
-                worksheet.write('N{}'.format(row+2), pig)
+                worksheet.cell(row=row+2, column=14).value = pig
 
-        workbook.close()
+        try:
+            workbook.save(filename)
+        except PermissionError as error:
+            logging.error(str(error))
+            return
 
         logging.info('Exported successfully groups statistics in {} file'.format(filename))
 

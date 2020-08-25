@@ -6,8 +6,6 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 
-import xlsxwriter
-
 from inspigtor.gui.dialogs.dunn_matrix_dialog import DunnMatrixDialog
 from inspigtor.gui.models.pvalues_data_model import PValuesDataModel
 from inspigtor.gui.utils.helper_functions import find_main_window

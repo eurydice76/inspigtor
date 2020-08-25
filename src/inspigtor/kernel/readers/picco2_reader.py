@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 
-import xlsxwriter
+import openpyxl
 
 import numpy as np
 
@@ -402,31 +402,37 @@ class PiCCO2FileReader:
         if not stats:
             return
 
-        workbook = xlsxwriter.Workbook(filename)
-        worksheet = workbook.add_worksheet(os.path.basename(self._filename) if len(self._filename) <= 31 else 'pig')
-        worksheet.write('K1', 'Selected property')
-        worksheet.write('K2', selected_property)
-        worksheet.write('A1', 'Interval')
-        worksheet.write('B1', 'Average')
-        worksheet.write('C1', 'Std Dev')
-        worksheet.write('D1', 'Median')
-        worksheet.write('E1', '1st quartile')
-        worksheet.write('F1', '3rd quartile')
-        worksheet.write('G1', 'Skewness')
-        worksheet.write('H1', 'kurtosis')
+        workbook = openpyxl.Workbook()
+        workbook.create_sheet('pig')
+        worksheet = workbook.get_sheet_by_name('pig')
+
+        worksheet.cell(row=1, column=11).value = 'Selected property'
+        worksheet.cell(row=2, column=11).value = selected_property
+        worksheet.cell(row=1, column=1).value = 'Interval'
+        worksheet.cell(row=1, column=2).value = 'Average'
+        worksheet.cell(row=1, column=3).value = 'Std Dev'
+        worksheet.cell(row=1, column=4).value = 'Median'
+        worksheet.cell(row=1, column=5).value = '1st quartile'
+        worksheet.cell(row=1, column=6).value = '3rd quartile'
+        worksheet.cell(row=1, column=7).value = 'Skewness'
+        worksheet.cell(row=1, column=8).value = 'kurtosis'
 
         for i, interval in enumerate(stats['intervals']):
 
-            worksheet.write('A{}'.format(i+2), interval)
-            worksheet.write('B{}'.format(i+2), stats['averages'][i])
-            worksheet.write('C{}'.format(i+2), stats['stddevs'][i])
-            worksheet.write('D{}'.format(i+2), stats['medians'][i])
-            worksheet.write('E{}'.format(i+2), stats['1st quantiles'][i])
-            worksheet.write('F{}'.format(i+2), stats['3rd quantiles'][i])
-            worksheet.write('G{}'.format(i+2), stats['skewnesses'][i])
-            worksheet.write('H{}'.format(i+2), stats['kurtosis'][i])
+            worksheet.cell(row=i+2, column=1).value = interval
+            worksheet.cell(row=i+2, column=2).value = stats['averages'][i]
+            worksheet.cell(row=i+2, column=3).value = stats['stddevs'][i]
+            worksheet.cell(row=i+2, column=4).value = stats['medians'][i]
+            worksheet.cell(row=i+2, column=5).value = stats['1st quantiles'][i]
+            worksheet.cell(row=i+2, column=6).value = stats['3rd quantiles'][i]
+            worksheet.cell(row=i+2, column=7).value = stats['skewnesses'][i]
+            worksheet.cell(row=i+2, column=8).value = stats['kurtosis'][i]
 
-        workbook.close()
+        try:
+            workbook.save(filename)
+        except PermissionError as error:
+            logging.error(str(error))
+            return
 
 
 if __name__ == '__main__':

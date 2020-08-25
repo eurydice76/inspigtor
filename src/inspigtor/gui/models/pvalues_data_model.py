@@ -4,7 +4,7 @@
 
 import logging
 
-import xlsxwriter
+import openpyxl
 
 from PyQt5 import QtCore, QtGui
 
@@ -81,28 +81,30 @@ class PValuesDataModel(QtCore.QAbstractTableModel):
             filename (str): the excel filename
         """
 
-        try:
-            workbook = xlsxwriter.Workbook(filename)
-        except xlsxwriter.exceptions.FileCreateError as error:
-            logging.error(str(error))
-            return
+        workbook = openpyxl.Workbook()
 
-        worksheet = workbook.add_worksheet('p-values')
+        workbook.create_sheet('p-values')
+
+        worksheet = workbook.get_sheet_by_name('p-values')
 
         # Write column titles
         for col in range(self.columnCount()):
             col_name = self.headerData(col, QtCore.Qt.Horizontal, role=QtCore.Qt.DisplayRole)
-            worksheet.write(0, col+1, col_name)
+            worksheet.cell(row=1, column=col+2).value = col_name
 
         # Write row titles
         for row in range(self.rowCount()):
             row_name = self.headerData(row, QtCore.Qt.Vertical, role=QtCore.Qt.DisplayRole)
-            worksheet.write(row+1, 0, row_name)
+            worksheet.cell(row=row+2, column=1).value = row_name
 
         for row in range(self.rowCount()):
             for col in range(self.columnCount()):
                 index = self.index(row, col)
                 data = self.data(index, QtCore.Qt.DisplayRole)
-                worksheet.write(row+1, col+1, data)
+                worksheet.cell(row=row+2, column=col+2).value = data
 
-        workbook.close()
+        try:
+            workbook.save(filename)
+        except PermissionError as error:
+            logging.error(str(error))
+            return
