@@ -4,5 +4,3 @@ pandas
 PyQt5
 scipy
 scikit-posthocs
-openpyxl
-bioread

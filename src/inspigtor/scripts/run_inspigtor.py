@@ -4,7 +4,7 @@ import sys
 
 from PyQt5 import QtWidgets
 
-from inspigtor.gui.main_window import MainWindow
+from inspigtor.gui.main_windows.main_window import MainWindow
 
 
 def main():

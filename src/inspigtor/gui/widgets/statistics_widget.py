@@ -10,7 +10,7 @@ from inspigtor.gui.dialogs.premortem_statistics_dialog import PreMortemStatistic
 from inspigtor.gui.dialogs.time_effect_dialog import TimeEffectDialog
 from inspigtor.gui.models.pigs_groups_model import PigsGroupsModel
 from inspigtor.gui.models.pigs_pool_model import PigsPoolModel
-from inspigtor.gui.widgets.pigs_pool_list_view import PigsPoolListView
+from inspigtor.gui.views.pigs_pool_listview import PigsPoolListView
 from inspigtor.kernel.pigs.pigs_groups import PigsGroupsError
 
 

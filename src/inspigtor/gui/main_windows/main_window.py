@@ -12,8 +12,8 @@ from inspigtor.gui.dialogs.individual_averages_dialog import IndividualAveragesD
 from inspigtor.gui.dialogs.property_plotter_dialog import PropertyPlotterDialog
 from inspigtor.gui.models.pigs_pool_model import PigsPoolModel
 from inspigtor.gui.models.pandas_data_model import PandasDataModel
-from inspigtor.gui.views.pigs_view import PigsView
-from inspigtor.gui.widgets.copy_pastable_tableview import CopyPastableTableView
+from inspigtor.gui.views.copy_pastable_tableview import CopyPastableTableView
+from inspigtor.gui.views.double_clickable_listview import DoubleClickableListView
 from inspigtor.gui.widgets.intervals_widget import IntervalsWidget
 from inspigtor.gui.widgets.logger_widget import QTextEditLogger
 from inspigtor.gui.widgets.multiple_directories_selector import MultipleDirectoriesSelector
@@ -184,7 +184,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._main_frame = QtWidgets.QFrame(self)
 
-        self._pigs_list = PigsView()
+        self._pigs_list = DoubleClickableListView()
         self._pigs_list.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
         self._pigs_list.setDragEnabled(True)
@@ -229,7 +229,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar().addPermanentWidget(self._progress_label)
         self.statusBar().addPermanentWidget(self._progress_bar)
 
-        icon_path = os.path.join(inspigtor.__path__[0], "icons", "icon.png")
+        icon_path = os.path.join(inspigtor.__path__[0], "icons", "inspigtor.png")
         self.setWindowIcon(QtGui.QIcon(icon_path))
 
         self.show()
@@ -350,7 +350,7 @@ class MainWindow(QtWidgets.QMainWindow):
             progress_bar.update(progress+1)
 
         # Create a signal/slot connexion for row changed event
-        self._pigs_list.selectionModel().currentChanged.connect(self.on_select_pig)
+        self._pigs_list.selectionModel().selectionChanged.connect(self.on_select_pig)
 
         self._pigs_list.setCurrentIndex(pigs_model.index(0, 0))
 
@@ -422,7 +422,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             data_files = glob.glob(os.path.join(exp_dir, '*.csv'))
 
-            # Loop over the Data*csv csv files found in the current oig directory
+            # Loop over the csv files found in the current oig directory
             for data_file in data_files:
                 try:
                     reader = PiCCO2FileReader(data_file)

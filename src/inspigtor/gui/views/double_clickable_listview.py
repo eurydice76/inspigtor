@@ -4,7 +4,7 @@ import io
 from PyQt5 import QtCore, QtWidgets
 
 
-class PigsView(QtWidgets.QListView):
+class DoubleClickableListView(QtWidgets.QListView):
     """This class implements a QListView with double click event.
     """
 
@@ -20,4 +20,4 @@ class PigsView(QtWidgets.QListView):
         if self.model().rowCount() == 0:
             self.double_clicked_empty.emit()
 
-        return super(PigsView, self).mouseDoubleClickEvent(event)
+        return super(DoubleClickableListView, self).mouseDoubleClickEvent(event)

@@ -9,7 +9,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationTool
 from inspigtor.gui.dialogs.dunn_matrix_dialog import DunnMatrixDialog
 from inspigtor.gui.models.pvalues_data_model import PValuesDataModel
 from inspigtor.gui.utils.helper_functions import find_main_window
-from inspigtor.gui.widgets.copy_pastable_tableview import CopyPastableTableView
+from inspigtor.gui.views.copy_pastable_tableview import CopyPastableTableView
 from inspigtor.kernel.utils.helper_functions import build_timeline
 
 
