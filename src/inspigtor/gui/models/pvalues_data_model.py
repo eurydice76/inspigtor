@@ -82,6 +82,8 @@ class PValuesDataModel(QtCore.QAbstractTableModel):
         """
 
         workbook = openpyxl.Workbook()
+        # Remove the first empty sheet created by default
+        workbook.remove_sheet(workbook.get_sheet_by_name('Sheet'))
 
         workbook.create_sheet('p-values')
 

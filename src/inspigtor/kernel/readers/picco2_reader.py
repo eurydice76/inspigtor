@@ -403,6 +403,10 @@ class PiCCO2FileReader:
             return
 
         workbook = openpyxl.Workbook()
+
+        # Remove the first empty sheet created by default
+        workbook.remove_sheet(workbook.get_sheet_by_name('Sheet'))
+
         workbook.create_sheet('pig')
         worksheet = workbook.get_sheet_by_name('pig')
 

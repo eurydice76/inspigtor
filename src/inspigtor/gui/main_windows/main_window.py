@@ -350,7 +350,7 @@ class MainWindow(QtWidgets.QMainWindow):
             progress_bar.update(progress+1)
 
         # Create a signal/slot connexion for row changed event
-        self._pigs_list.selectionModel().selectionChanged.connect(self.on_select_pig)
+        self._pigs_list.selectionModel().currentChanged.connect(self.on_select_pig)
 
         self._pigs_list.setCurrentIndex(pigs_model.index(0, 0))
 

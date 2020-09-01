@@ -84,7 +84,8 @@ class PigsGroups:
         averages_per_group = {}
         for i, group in enumerate(selected_groups):
             try:
-                averages_per_group[group] = self._groups[group].get_statistics(selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
+                averages_per_group[group] = self._groups[group].get_statistics(
+                    selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
             except PigsPoolError as error:
                 logging.error(str(error))
                 continue
@@ -199,7 +200,8 @@ class PigsGroups:
         averages_per_group = {}
         for group in selected_groups:
             try:
-                averages_per_group[group] = self._groups[group].get_statistics(selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
+                averages_per_group[group] = self._groups[group].get_statistics(
+                    selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
             except PigsPoolError as error:
                 logging.error(str(error))
                 continue
@@ -300,6 +302,9 @@ class PigsGroups:
             selected_groups = list(all_groups.intersection(selected_groups))
 
         workbook = openpyxl.Workbook()
+        # Remove the first empty sheet created by default
+        workbook.remove_sheet(workbook.get_sheet_by_name('Sheet'))
+
         for group in selected_groups:
 
             try:
@@ -320,12 +325,12 @@ class PigsGroups:
 
             # Add titles
             for col, func in enumerate(statistical_functions.keys()):
-                worksheet.cell(row=1, column=col+1).value = func
+                worksheet.cell(row=1, column=col+2).value = func
 
                 for row, value in enumerate(reduced_averages[func]):
 
                     worksheet.cell(row=row+2, column=1).value = row+1
-                    worksheet.cell(row=row+2, column=col+1).value = value
+                    worksheet.cell(row=row+2, column=col+2).value = value
 
             pigs = self._groups[group].pigs.keys()
             for row, pig in enumerate(pigs):
