@@ -188,6 +188,7 @@ class PiCCO2FileReader:
 
         Args:
             selected_property (str): the selected property
+            selected_statistics (list): the list of statistics to compute
             interval_indexes (list of int): the indexes of the record intervals to select. If None, all the record intervals will be used.
 
         Returns:
@@ -216,7 +217,6 @@ class PiCCO2FileReader:
 
         statistics = {}
 
-        # Compute for each record interval the average and standard deviation of the selected property
         for index in interval_indexes:
             interval = self._record_intervals[index]
             first_index, last_index = interval
