@@ -453,7 +453,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Fetch the selected reader
         selected_row = self._pigs_list.currentIndex().row()
-        reader = pigs_model.item(selected_row, 0).data(pigs_model.Reader)
+        index = pigs_model.index(selected_row, 0)
+        reader = pigs_model.data(index, pigs_model.Reader)
 
         # Build the x and y values
         xs = []
@@ -537,7 +538,8 @@ class MainWindow(QtWidgets.QMainWindow):
         plot_menu = QtWidgets.QMenu('Plot')
 
         pigs_model = self._pigs_list.model()
-        reader = pigs_model.item(self._pigs_list.currentIndex().row(), 0).data(pigs_model.Reader)
+        index = pigs_model.index(self._pigs_list.currentIndex().row(), 0)
+        reader = pigs_model.data(index, pigs_model.Reader)
 
         properties = reader.data.columns
         for prop in properties:
