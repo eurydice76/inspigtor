@@ -75,8 +75,6 @@ class PigsPool:
             valid_intervals.append(i)
             valid_averages_per_interval.append(averages)
 
-        valid_averages_per_interval = [row for row in zip(*valid_averages_per_interval)]
-
         p_value = stats.friedmanchisquare(*valid_averages_per_interval).pvalue
 
         return valid_intervals, p_value
