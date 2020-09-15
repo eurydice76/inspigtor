@@ -241,7 +241,7 @@ class PigsPool:
             averages.append(descriptive_statistics['mean'])
 
         # Transpose the nested list such as the number rows is the number of intervals and the number of columns the number of individuals
-        #averages = [list(x) for x in zip(*averages)]
+        averages = [list(x) for x in zip(*averages)]
 
         friedman_statistics = stats.friedmanchisquare(*averages).pvalue
         data_frame = sk.posthoc_dunn(averages)
