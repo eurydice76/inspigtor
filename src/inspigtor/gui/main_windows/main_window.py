@@ -64,6 +64,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pig_selected.connect(self._intervals_widget.on_update_record_intervals)
         self._selected_property_combo.currentTextChanged.connect(self.on_change_selected_property)
         self._show_individual_averages_button.clicked.connect(self.on_show_individual_averages)
+        self._pigs_list.model().reader_removed.connect(self._statistics_widget.on_remove_reader)
 
     def build_layout(self):
         """Build the layout.
@@ -509,6 +510,10 @@ class MainWindow(QtWidgets.QMainWindow):
         """
 
         reader = self._pigs_list.model().data(index, PigsPoolModel.Reader)
+
+        if reader == QtCore.QVariant():
+            self._data_table.setModel(None)
+            return
 
         # Update the data table with the selected data
         data = reader.data

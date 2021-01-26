@@ -45,7 +45,6 @@ class CoveragesWidget(QtWidgets.QWidget):
         # Build the matplotlib imsho widget
         self._figure = Figure()
         self._axes = self._figure.add_subplot(111)
-        self._axes.set_xlabel('interval')
         self._axes.set_ylabel('coverage')
         self._canvas = FigureCanvasQTAgg(self._figure)
         self._toolbar = NavigationToolbarWithExportButton(self._canvas, self)
@@ -58,30 +57,29 @@ class CoveragesWidget(QtWidgets.QWidget):
 
         self.build_layout()
 
-    def update_coverage_plot(self, coverages):
+    def update_coverage_plot(self, reader, selected_property):
         """Update the coverage plot
 
         Args:
-            coverages (list): the coverages values to plot
+            reader (): the reader for which the coverage plot should be set
+            selected_property: the selected property
         """
+
+        coverages = reader.get_coverages(selected_property)
 
         if not coverages:
             return
 
-        n_intervals = len(coverages)
-
-        x = range(0, n_intervals)
-        interval_data = self.parent().interval_settings_label.data()
-
-        tick_labels = range(1, n_intervals+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), x)
-
         self._axes.clear()
-        self._axes.plot(x, coverages)
-        self._axes.set_xlabel('interval')
-        self._axes.xaxis.set_minor_locator(ticker.AutoLocator())
-        self._axes.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda tick_val, tick_pos: func_formatter(tick_val, tick_pos, tick_labels)))
-        self._axes.xaxis.set_major_locator(ticker.IndexLocator(base=10.0, offset=0.0))
-        self._axes.xaxis.set_major_formatter(ticker.FuncFormatter(lambda tick_val, tick_pos: func_formatter(tick_val, tick_pos, tick_labels)))
+
+        timeline = reader.timeline
+
+        self._axes.plot(timeline, coverages)
+        loc = ticker.IndexLocator(base=10.0, offset=reader.t_initial_interval_index)
+        self._axes.xaxis.set_major_locator(loc)
+        for tick in self._axes.xaxis.get_major_ticks():
+            tick.label.set_fontsize(6)
+
         self._axes.set_ylabel('coverage')
 
         self._canvas.draw()

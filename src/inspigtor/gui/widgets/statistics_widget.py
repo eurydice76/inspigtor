@@ -156,7 +156,13 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('No groups defined yet')
             return
 
-        dialog = GroupEffectDialog(self._groups_list.model(), self)
+        selected_property = self._main_window.selected_property
+
+        global_effect = groups_model.evaluate_global_group_effect(selected_property=selected_property, selected_groups=groups_model.selected_groups)
+
+        pairwise_effect = groups_model.evaluate_pairwise_group_effect(selected_property=selected_property, selected_groups=groups_model.selected_groups)
+
+        dialog = GroupEffectDialog(selected_property, global_effect, pairwise_effect, self)
         dialog.show()
 
     def on_display_time_effect_statistics(self):
@@ -248,3 +254,15 @@ class StatisticsWidget(QtWidgets.QWidget):
         pigs_pool_model = PigsPoolModel(self, current_pig_pool)
 
         self._individuals_list.setModel(pigs_pool_model)
+
+    def on_remove_reader(self, filename):
+        """Delete the selected reader filename from the pig pools which store it.
+        """
+
+        groups_model = self._groups_list.model()
+
+        groups_model.remove_reader(filename)
+
+        pigs_pool_model = self._individuals_list.model()
+        if pigs_pool_model is not None:
+            pigs_pool_model.layoutChanged.emit()

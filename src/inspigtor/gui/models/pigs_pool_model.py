@@ -13,6 +13,8 @@ class PigsPoolModel(QtCore.QAbstractListModel):
 
     Reader = QtCore.Qt.UserRole + 1
 
+    reader_removed = QtCore.pyqtSignal(str)
+
     def __init__(self, parent, pigs_pool=None):
         """Constructor.
 
@@ -47,6 +49,18 @@ class PigsPoolModel(QtCore.QAbstractListModel):
 
         self.endInsertRows()
 
+    def remove_index(self, index):
+        """Remove 
+        """
+
+        pigs = self._pigs_pool.pigs
+
+        pig_names = list(pigs.keys())
+
+        filename = pig_names[index]
+
+        self.remove_reader(filename)
+
     def remove_reader(self, filename):
 
         pigs = self._pigs_pool.pigs
@@ -60,6 +74,8 @@ class PigsPoolModel(QtCore.QAbstractListModel):
         self._pigs_pool.remove_reader(filename)
 
         self.endRemoveRows()
+
+        self.reader_removed.emit(filename)
 
     def data(self, index, role):
         """

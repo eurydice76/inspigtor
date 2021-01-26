@@ -89,16 +89,13 @@ class PiCCO2FileReader:
         self._time_fmt = '%H:%M:%S'
         self._exp_start = datetime.strptime(self._data.iloc[0]['Time'], self._time_fmt)
 
+        delta_t = datetime.strptime(general_info_dict['t_initial'], self._time_fmt) - datetime.strptime(self._data['Time'][0], self._time_fmt)
+        if delta_t.days < 0 or delta_t.seconds < 600:
+            raise PiCCO2FileReaderError('t_initial - 10 minutes is earlier than the beginning of the experiment for file {}.'.format(self._filename))
+
         # The evaluation of intervals starts at t_zero - 10 minutes (as asked by experimentalists)
         t_minus_10_strptime = datetime.strptime(general_info_dict['t_initial'], self._time_fmt) - datetime.strptime('00:10:00', self._time_fmt)
-
-        # If the t_zero - 10 is earlier than the beginning of the experiment set t_minus_10_strptime to the starting time of the experiment
-        if t_minus_10_strptime.days < 0 or t_minus_10_strptime.seconds < 600:
-            logging.warning(
-                't_initial - 10 minutes is earlier than the beginning of the experiment for file {}. Will use its starting time instead.'.format(self._filename))
-            t_minus_10_strptime = self._exp_start
-        else:
-            t_minus_10_strptime = datetime.strptime(str(t_minus_10_strptime), self._time_fmt)
+        t_minus_10_strptime = datetime.strptime(str(t_minus_10_strptime), self._time_fmt)
 
         self._t_minus_10_index = 0
 
@@ -390,6 +387,32 @@ class PiCCO2FileReader:
 
         return self.t_interval_index(self._parameters['t_initial'])
 
+    @property
+    def timeline(self):
+        """Build the timeline using the record value and the list of intervals.
+
+        Returns:
+            list of str: the timeline
+        """
+
+        # if no record intervals have been defined yet, returns an empty list
+        if not self._record_intervals:
+            return []
+
+        initial_time = self.t_initial_interval_index
+
+        record_in_minutes = int(self._record/60)
+
+        timeline = []
+        for i in range(-initial_time, len(self._record_intervals)-initial_time):
+            time = i*record_in_minutes
+            hours = abs(time)//60
+            minutes = abs(time) % 60
+            minus = '' if time >= 0.0 else '-'
+            timeline.append("{}{}h{:02d}".format(minus, hours, minutes))
+
+        return timeline
+
     def write_summary(self, filename, selected_property='APs'):
         """Write the summay about the statistics for a selected property to an excel file.
 
@@ -442,8 +465,9 @@ class PiCCO2FileReader:
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    reader.set_record_interval(('00:00:00', '6:15:00', 2))
-    print(reader.record_times)
-    print(reader.t_initial_interval_index)
-    print(reader.get_t_final_index())
-    print(reader.get_descriptive_statistics(interval_indexes=[1, 2]))
+    # reader.set_record_interval(('00:00:00', '6:15:00', 2))
+    # print(reader.record_times)
+    # print(reader.t_initial_interval_index)
+    # print(reader.get_t_final_index())
+    # print(reader.timeline)
+    # print(reader.get_descriptive_statistics())

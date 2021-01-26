@@ -96,11 +96,9 @@ class IndividualAveragesDialog(QtWidgets.QDialog):
             logging.error(str(error))
             return
 
-        xs = []
         averages = []
         stds = []
         for interval, average, std in zip(individual_averages['intervals'], individual_averages['mean'], individual_averages['std']):
-            xs.append(interval)
             averages.append(average)
             stds.append(std)
 
@@ -113,12 +111,13 @@ class IndividualAveragesDialog(QtWidgets.QDialog):
         self._axes.set_xlabel('interval')
         self._axes.set_ylabel(self._selected_property)
 
-        main_window = find_main_window()
-        interval_data = main_window.intervals_widget.interval_settings_label.data()
-        tick_labels = range(1, len(xs)+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), xs)
+        timeline = reader.timeline
 
-        self._plot = self._axes.errorbar(xs, averages, yerr=stds, fmt='ro')
-        self._axes.xaxis.set_major_locator(ticker.IndexLocator(base=10.0, offset=0.0))
-        self._axes.xaxis.set_major_formatter(ticker.FuncFormatter(lambda tick_val, tick_pos: func_formatter(tick_val, tick_pos, tick_labels)))
+        self._plot = self._axes.errorbar(timeline, averages, yerr=stds, fmt='ro')
+        loc = ticker.IndexLocator(base=10.0, offset=reader.t_initial_interval_index)
+        self._axes.xaxis.set_major_locator(loc)
+        for tick in self._axes.xaxis.get_major_ticks():
+            tick.label.set_fontsize(8)
+            tick.label.set_rotation('vertical')
 
         self._canvas.draw()

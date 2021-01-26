@@ -44,9 +44,9 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
         """
         """
 
-        intervals, p_values, n_groups = self._pigs_groups.evaluate_global_group_effect(selected_property=selected_property, selected_groups=selected_groups)
+        p_values = self._pigs_groups.evaluate_global_group_effect(selected_property=selected_property, selected_groups=selected_groups)
 
-        return intervals, p_values, n_groups
+        return p_values
 
     def evaluate_pairwise_group_effect(self, selected_property='APs', selected_groups=None):
         """
@@ -72,9 +72,9 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
         """
         """
 
-        p_values = self._pigs_groups.evaluate_pairwise_time_effect(selected_property=selected_property, selected_groups=selected_groups)
+        valid_groups = self._pigs_groups.evaluate_pairwise_time_effect(selected_property=selected_property, selected_groups=selected_groups)
 
-        return p_values
+        return valid_groups
 
     def add_group(self, group):
         """Add a group to the model.
@@ -163,3 +163,11 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
         """
 
         return len(self.selected_groups)
+
+    def remove_reader(self, filename):
+        """
+        """
+
+        self._pigs_groups.remove_reader(filename)
+
+        self.layoutChanged.emit()

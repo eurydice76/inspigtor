@@ -184,18 +184,17 @@ class IntervalsWidget(QtWidgets.QWidget):
         self._intervals_list.selectionModel().currentChanged.connect(self.on_select_interval)
 
         record_times = reader.record_times
+        timeline = reader.timeline
         for i, interval in enumerate(record_intervals):
-            item = QtGui.QStandardItem('interval {}'.format(i+1))
+            item = QtGui.QStandardItem(timeline[i])
             item.setData(interval)
             item.setData(" - ".join(record_times[i]), QtCore.Qt.ToolTipRole)
             model.appendRow(item)
 
         self.update_properties.emit(list(reader.data.columns))
 
-        coverages = reader.get_coverages(self._pigs_model.selected_property)
-
         t_initial_interval_index = reader.t_initial_interval_index
         index = model.index(t_initial_interval_index, 0)
         model.setData(index, QtGui.QBrush(QtCore.Qt.red), QtCore.Qt.ForegroundRole)
 
-        self._coverages_widget.update_coverage_plot(coverages)
+        self._coverages_widget.update_coverage_plot(reader, self._pigs_model.selected_property)

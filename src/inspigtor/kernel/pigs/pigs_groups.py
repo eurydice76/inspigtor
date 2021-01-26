@@ -5,6 +5,8 @@ import openpyxl
 
 import numpy as np
 
+import pandas as pd
+
 import scipy.stats as stats
 
 import scikit_posthocs as sk
@@ -62,10 +64,7 @@ class PigsGroups:
             interval_indexes (list of int): the indexes of the record intervals to select. If None, all the
             record intervals will be used.
 
-        Returns:
-            list of int: the valid intervals for which the Kruskal-Wallis or Mann-Whitney tests could be performed.
-            list of float: the p values resulting from Kruskal-Wallis or Mann-Whitney tests.
-
+        Returns:clear
         Raises:
             PigsGroupsError: if the number of groups is less than two.
         """
@@ -80,56 +79,68 @@ class PigsGroups:
         if len(selected_groups) < 2:
             raise PigsGroupsError('There is less than two groups. Can not perform any global statistical test.')
 
+        longest_timeline = []
+
         progress_bar.reset(len(selected_groups))
-        averages_per_group = {}
+        averages_per_group = collections.OrderedDict()
         for i, group in enumerate(selected_groups):
             try:
-                averages_per_group[group] = self._groups[group].get_statistics(
+                timeline, averages_per_group[group] = self._groups[group].get_statistics(
                     selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
             except PigsPoolError as error:
-                logging.error(str(error))
-                continue
-            finally:
+                raise PigsGroupsError from error
+            else:
+                if len(timeline) > len(longest_timeline):
+                    longest_timeline = timeline
+
                 progress_bar.update(i+1)
 
         if not averages_per_group:
             raise PigsGroupsError('There is less than two groups. Can not perform any global statistical test.')
 
-        max_n_intervals = max([v.shape[0] for v in averages_per_group.values()])
+        progress_bar.reset(len(longest_timeline))
 
-        progress_bar.reset(max_n_intervals)
-
-        valid_intervals = []
-        p_values = []
-        n_groups = []
+        p_values_per_time = []
         # Loop over the intervals
-        for interv in range(max_n_intervals):
+        for i, time in enumerate(longest_timeline):
             groups = []
+            n_values_per_group = []
+            uncomplete_group = False
             for averages in averages_per_group.values():
-                # This interval is ont defined for this group, skip the group
-                if interv >= averages.shape[0]:
-                    continue
-                values = [v for v in averages[interv, :] if not np.isnan(v)]
-                if not values:
-                    continue
-                groups.append(values)
-
-            valid_intervals.append(interv)
-            if len(groups) < 2:
-                n_groups.append(np.nan)
-                p_values.append(np.nan)
-            else:
-                n_groups.append(len(groups))
-                if n_groups[-1] == 2:
-                    p_value = stats.mannwhitneyu(*groups, alternative='two-sided').pvalue
+                # This interval is not defined for this group, skip the group
+                if i >= averages.shape[0]:
+                    uncomplete_group = True
+                    n_values_per_group.append(0)
                 else:
-                    p_value = stats.kruskal(*groups).pvalue
+                    values = [v for v in averages[i, :] if not np.isnan(v)]
+                    if not values:
+                        uncomplete_group = True
+                        n_values_per_group.append(0)
+                    else:
+                        groups.append(values)
+                        n_values_per_group.append(len(values))
 
-                p_values.append(p_value)
+            if uncomplete_group:
+                p_value = np.nan
+            else:
+                n_groups = len(groups)
+                if n_groups < 2:
+                    p_value = np.nan
+                else:
+                    if n_groups == 2:
+                        p_value = stats.mannwhitneyu(*groups, alternative='two-sided').pvalue
+                    else:
+                        p_value = stats.kruskal(*groups).pvalue
 
-            progress_bar.update(interv+1)
+            p_values_per_time.append(n_values_per_group + [p_value])
 
-        return valid_intervals, p_values, n_groups
+            progress_bar.update(i+1)
+
+        group_names = list(averages_per_group.keys())
+        columns = group_names + ['p value']
+        p_values = pd.DataFrame(p_values_per_time, index=longest_timeline, columns=columns)
+
+        return p_values
 
     def evaluate_global_time_effect(self, selected_property='APs', selected_groups=None, interval_indexes=None):
         """Performs a Friedman statistical test to check whether the averages defined for each pig over record intervals
@@ -197,51 +208,45 @@ class PigsGroups:
         if len(selected_groups) < 2:
             raise PigsGroupsError('There is less than two groups. Can not perform any global statistical test.')
 
-        averages_per_group = {}
-        for group in selected_groups:
+        longest_timeline = []
+        averages_per_group = collections.OrderedDict()
+        for i, group in enumerate(selected_groups):
             try:
-                averages_per_group[group] = self._groups[group].get_statistics(
+                timeline, averages_per_group[group] = self._groups[group].get_statistics(
                     selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
             except PigsPoolError as error:
-                logging.error(str(error))
-                continue
+                raise PigsGroupsError from error
+            else:
+                if len(timeline) > len(longest_timeline):
+                    longest_timeline = timeline
+
+        group_names = list(averages_per_group.keys())
 
         if not averages_per_group:
             raise PigsGroupsError('There is less than two groups. Can not perform any global statistical test.')
 
-        max_n_intervals = max([v.shape[0] for v in averages_per_group.values()])
-
-        progress_bar.reset(max_n_intervals)
-        valid_intervals = []
+        progress_bar.reset(len(longest_timeline))
         p_values = collections.OrderedDict()
         # Loop over the intervals
-        for interv in range(max_n_intervals):
-            groups = []
-            group_names = []
-            for group_name, averages in averages_per_group.items():
-                # This interval is ont defined for this group, skip the group
-                if interv >= averages.shape[0]:
-                    continue
-                values = [v for v in averages[interv, :] if not np.isnan(v)]
-                if not values:
-                    continue
-                group_names.append(group_name)
-                groups.append(values)
+        for i, time in enumerate(longest_timeline):
+            uncomplete_group = False
+            for averages in averages_per_group.values():
+                # This interval is not defined for this group, skip the group
+                if i >= averages.shape[0]:
+                    uncomplete_group = True
+                else:
+                    values = [v for v in averages[i, :] if not np.isnan(v)]
+                    if not values:
+                        uncomplete_group = True
+                    else:
+                        groups.append(values)
 
-            n_groups = len(groups)
-            if n_groups >= 2:
-                valid_intervals.append(interv)
-                data_frame = sk.posthoc_dunn(groups)
-                for i in range(0, n_groups - 1):
-                    group_i = selected_groups[i]
-                    for j in range(i+1, n_groups):
-                        group_j = selected_groups[j]
-                        key = '{} vs {}'.format(group_i, group_j)
-                        if key not in p_values:
-                            p_values[key] = {'intervals': [], 'values': []}
-                        p_values[key]['intervals'].append(interv)
-                        p_values[key]['values'].append(data_frame.iloc[i, j])
-            progress_bar.update(interv+1)
+            if uncomplete_group or len(groups) < 2:
+                p_values[time] = pd.DataFrame(np.nan, index=group_names, columns=group_names)
+            else:
+                p_values[time] = pd.DataFrame(sk.posthoc_dunn(groups).to_numpy(), index=group_names, columns=group_names)
+
+            progress_bar.update(i+1)
 
         return p_values
 
@@ -266,23 +271,19 @@ class PigsGroups:
             selected_groups = list(all_groups.intersection(selected_groups))
 
         progress_bar.reset(len(selected_groups))
-        valid_groups = []
-        valid_intervals = []
-        p_values = []
+        valid_groups = collections.OrderedDict()
         for i, group in enumerate(selected_groups):
             try:
-                intervals, p_values_df = self._groups[group].evaluate_pairwise_time_effect(
+                p_values = self._groups[group].evaluate_pairwise_time_effect(
                     selected_property=selected_property, interval_indexes=interval_indexes)
             except PigsPoolError:
                 logging.error('Can not evaluate pairwise time effect for group {}'.format(group))
             else:
-                valid_groups.append(group)
-                valid_intervals.append(intervals)
-                p_values.append(p_values_df)
+                valid_groups[group] = p_values
             finally:
                 progress_bar.update(i+1)
 
-        return valid_groups, valid_intervals, p_values
+        return valid_groups
 
     def export_statistics(self, filename, selected_property='APs', selected_groups=None, interval_indexes=None):
         """Export basic statistics (average, median, std, quartile ...) for each group and interval to an excel file.
@@ -318,18 +319,23 @@ class PigsGroups:
             workbook.create_sheet(group)
             worksheet = workbook.get_sheet_by_name(group)
 
-            worksheet.cell(row=1, column=1).value = 'interval'
+            worksheet.cell(row=1, column=1).value = 'time'
             worksheet.cell(row=1, column=12).value = 'selected property'
             worksheet.cell(row=2, column=12).value = selected_property
             worksheet.cell(row=1, column=14).value = 'pigs'
+
+            longest_timeline = []
+            for reader in self._groups[group].pigs.values():
+                timeline = reader.timeline
+                if len(timeline) > len(longest_timeline):
+                    longest_timeline = timeline
 
             # Add titles
             for col, func in enumerate(statistical_functions.keys()):
                 worksheet.cell(row=1, column=col+2).value = func
 
                 for row, value in enumerate(reduced_averages[func]):
-
-                    worksheet.cell(row=row+2, column=1).value = row+1
+                    worksheet.cell(row=row+2, column=1).value = longest_timeline[row]
                     worksheet.cell(row=row+2, column=col+2).value = value
 
             pigs = self._groups[group].pigs.keys()
@@ -376,6 +382,17 @@ class PigsGroups:
             progress_bar.update(i+1)
 
         return dict(zip(selected_groups, p_values))
+
+    def remove_reader(self, filename):
+        """
+        """
+
+        for pool in self._groups.values():
+
+            if not pool.has_reader(filename):
+                continue
+
+            pool.remove_reader(filename)
 
     def set_record_interval(self, interval):
         """Set the record interval.

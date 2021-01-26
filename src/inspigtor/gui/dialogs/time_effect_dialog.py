@@ -10,7 +10,6 @@ from inspigtor.gui.dialogs.dunn_matrix_dialog import DunnMatrixDialog
 from inspigtor.gui.models.pvalues_data_model import PValuesDataModel
 from inspigtor.gui.utils.helper_functions import find_main_window
 from inspigtor.gui.views.copy_pastable_tableview import CopyPastableTableView
-from inspigtor.kernel.utils.helper_functions import build_timeline
 
 
 class TimeEffectDialog(QtWidgets.QDialog):
@@ -105,15 +104,12 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         self._friedman_canvas.draw()
 
-        valid_groups, valid_intervals, pairwise_p_values = self._groups_model.evaluate_pairwise_time_effect(
-            selected_property=selected_property, selected_groups=selected_groups)
-        if not pairwise_p_values:
-            return
+        valid_groups = self._groups_model.evaluate_pairwise_time_effect(selected_property=selected_property, selected_groups=selected_groups)
 
         self._selected_group_combo.clear()
-        self._selected_group_combo.addItems(valid_groups)
-        for i, p_values in enumerate(pairwise_p_values):
-            self._selected_group_combo.setItemData(i, (valid_intervals[i], p_values))
+        self._selected_group_combo.addItems(valid_groups.keys())
+        for i, p_values in enumerate(valid_groups.values()):
+            self._selected_group_combo.setItemData(i, p_values)
 
         self._selected_group_combo.currentIndexChanged.connect(self.on_select_group)
         self.on_select_group(0)
@@ -156,14 +152,7 @@ class TimeEffectDialog(QtWidgets.QDialog):
             selected_group (int): the selected group
         """
 
-        valid_intervals, p_values = self._selected_group_combo.itemData(selected_group)
-
-        main_window = find_main_window()
-        interval_data = main_window.intervals_widget.interval_settings_label.data()
-        labels = range(1, len(valid_intervals)+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), valid_intervals)
-
-        p_values.index = labels
-        p_values.columns = labels
+        p_values = self._selected_group_combo.itemData(selected_group)
 
         model = PValuesDataModel(p_values)
 

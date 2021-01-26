@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "/home/trc/venvs/inspigtor/bin/python",
+    "python.pythonPath": "/home/pellegrini/venvs/inspigtor/bin/python3",
     "python.venvPath": "/elysium3/Eric/Venvs/inspigtor",
     "python.globalModuleInstallation": true,
     "python.linting.enabled": true,

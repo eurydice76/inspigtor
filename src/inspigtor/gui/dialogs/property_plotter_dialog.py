@@ -10,7 +10,7 @@ class PropertyPlotterDialog(QtWidgets.QDialog):
 
     def __init__(self, main_window):
 
-        super(PropertyPlotterDialog, self).__init__()
+        super(PropertyPlotterDialog, self).__init__(main_window)
 
         self._main_window = main_window
 
@@ -29,10 +29,8 @@ class PropertyPlotterDialog(QtWidgets.QDialog):
 
     def build_widgets(self):
 
-        # Build the matplotlib imsho widget
+        # Build the matplotlib imshow widget
         self._figure = Figure()
-        # self._axes.set_xticks(range(self._reader.n_frames))
-        # self._axes.set_yticks(range(0, 2))
         self._canvas = FigureCanvasQTAgg(self._figure)
         self._toolbar = NavigationToolbar2QT(self._canvas, self)
 
@@ -43,8 +41,6 @@ class PropertyPlotterDialog(QtWidgets.QDialog):
         self.build_widgets()
 
         self.build_layout()
-
-        self.plot_property
 
     def plot_property(self, selected_property, xs, ys):
 

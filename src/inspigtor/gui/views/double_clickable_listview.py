@@ -21,3 +21,16 @@ class DoubleClickableListView(QtWidgets.QListView):
             self.double_clicked_empty.emit()
 
         return super(DoubleClickableListView, self).mouseDoubleClickEvent(event)
+
+    def keyPressEvent(self, event):
+        """Event called when the user press a keyboard key.
+        """
+
+        model = self.model()
+        if model is None:
+            return
+
+        if event.key() == QtCore.Qt.Key_Delete:
+
+            for sel_index in reversed(self.selectedIndexes()):
+                self.model().remove_index(sel_index.row())

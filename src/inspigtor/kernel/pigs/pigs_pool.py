@@ -3,6 +3,8 @@ import logging
 
 import numpy as np
 
+import pandas as pd
+
 import scipy.stats as stats
 import scikit_posthocs as sk
 
@@ -63,13 +65,14 @@ class PigsPool:
         """
 
         try:
-            averages_per_interval = self.get_statistics(selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
+            _, averages_per_interval = self.get_statistics(selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
         except PiCCO2FileReaderError as error:
             raise PigsPoolError('Error when getting pool statistics for {} property'.format(selected_property)) from error
 
         valid_intervals = []
         valid_averages_per_interval = []
         for i, averages in enumerate(averages_per_interval):
+            # If there is a nan in one the averages skip this interval
             if np.isnan(averages).any():
                 continue
             valid_intervals.append(i)
@@ -92,7 +95,7 @@ class PigsPool:
         """
 
         try:
-            averages_per_interval = self.get_statistics(selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
+            timeline, averages_per_interval = self.get_statistics(selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
         except PiCCO2FileReaderError as error:
             raise PigsPoolError('Error when getting pool statistics for {} property'.format(selected_property)) from error
 
@@ -107,9 +110,15 @@ class PigsPool:
         df = sk.posthoc_dunn(valid_averages_per_interval)
         df = df.round(4)
 
-        p_values = df
+        n_times = len(timeline)
 
-        return valid_intervals, p_values
+        p_values = pd.DataFrame(np.full((n_times, n_times), np.nan, dtype=float), index=timeline, columns=timeline)
+
+        for i, interv_i in enumerate(valid_intervals):
+            for j, interv_j in enumerate(valid_intervals):
+                p_values.iloc[interv_i, interv_j] = df.iloc[i, j]
+
+        return p_values
 
     def get_statistics(self, selected_property='APs', selected_statistics='mean', interval_indexes=None):
         """Returns a given statistics for a given property for each individual of the pool.
@@ -128,13 +137,12 @@ class PigsPool:
         """
 
         n_pigs = len(self._pigs)
-        max_n_intervals = 0
         all_statistics = []
         for reader in self._pigs.values():
 
             try:
                 descriptive_statistics = reader.get_descriptive_statistics(selected_property, selected_statistics=[
-                                                                           selected_statistics], interval_indexes=interval_indexes)
+                    selected_statistics], interval_indexes=interval_indexes)
             except PiCCO2FileReaderError as error:
                 logging.error(str(error))
                 continue
@@ -147,17 +155,25 @@ class PigsPool:
 
             all_statistics.append(individual_statistics)
 
-            max_n_intervals = max(max_n_intervals, len(individual_statistics))
+        longest_timeline = []
+        for reader in self._pigs.values():
+            timeline = reader.timeline
+            if len(timeline) > len(longest_timeline):
+                longest_timeline = timeline
 
         if not all_statistics:
             raise PigsPoolError('No statistics computed for pool')
 
-        output = np.full((max_n_intervals, n_pigs), np.nan, dtype=float)
+        output = np.full((len(longest_timeline), n_pigs), np.nan, dtype=float)
 
         for i, s in enumerate(all_statistics):
             output[0:len(s), i] = s
 
-        return output
+        return longest_timeline, output
+
+    def has_reader(self, filename):
+
+        return filename in self._pigs
 
     def reduced_statistics(self, selected_property='APs', selected_statistics='mean', interval_indexes=None, output_statistics=None):
         """Compute a set of statistics over the individuals.
@@ -169,7 +185,7 @@ class PigsPool:
             reduce (list of str): the list statistical functions used to reduce the output over axis=1
 
         Returns:
-            numpy.array: array which contain the sttaistics for each interval for each pig (row = number of intervals and columns = number of pigs)
+            dict: dictiionary mapping the output statistic with an array which containq the corresponding statistics for each interval
 
         Raises:
             PigsPoolError: if the selected statistics is not valid.
@@ -185,14 +201,14 @@ class PigsPool:
 
         reduced_statistics = {}
         for func in output_statistics:
-            reduced_statistics[func] = statistical_functions[func](statistics, axis=1)
+            reduced_statistics[func] = [statistical_functions[func](row) for row in statistics]
 
         if not reduced_statistics:
             raise PigsPoolError('Unknown reduce statistics')
 
         return reduced_statistics
 
-    @property
+    @ property
     def pigs(self):
         """Getter for self._pigs attribute.
 
@@ -203,7 +219,7 @@ class PigsPool:
         return self._pigs
 
     def premortem_statistics(self, n_last_intervals, selected_property='APs'):
-        """Compute the premortem statistics to assess putative time effect between the last interval before 
+        """Compute the premortem statistics to assess putative time effect between the last interval before
         intoxication and the n last intervals.
 
         This is basically the same procedure than for the global and pairwise time effect analysis
@@ -240,7 +256,7 @@ class PigsPool:
 
             averages.append(descriptive_statistics['mean'])
 
-        # Transpose the nested list such as the number rows is the number of intervals and the number of columns the number of individuals
+        # Transpose the nested list such as the number rows is the number of intervals and the number of columns is the number of individuals
         averages = [list(x) for x in zip(*averages)]
 
         friedman_statistics = stats.friedmanchisquare(*averages).pvalue
