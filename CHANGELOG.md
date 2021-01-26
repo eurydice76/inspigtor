@@ -1,3 +1,7 @@
+version 0.0.6
+--------------
+* UPDATED the times are now in real units
+
 version 0.0.5
 --------------
 * UPDATED work on windows installer
