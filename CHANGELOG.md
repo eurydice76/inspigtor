@@ -1,3 +1,8 @@
+version 0.0.7
+--------------
+* UPDATED refactored premortem analysis with real time units
+* UPDATED improved error handling
+
 version 0.0.6
 --------------
 * UPDATED the times are now in real units
