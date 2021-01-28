@@ -1,5 +1,7 @@
 import logging
 
+import pandas as pd
+
 from PyQt5 import QtCore
 
 from inspigtor.kernel.pigs.pigs_groups import PigsGroups, PigsGroupsError
@@ -45,36 +47,28 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
         """
 
         p_values = self._pigs_groups.evaluate_global_group_effect(selected_property=selected_property, selected_groups=selected_groups)
-
         return p_values
 
     def evaluate_pairwise_group_effect(self, selected_property='APs', selected_groups=None):
         """
         """
 
-        try:
-            p_values = self._pigs_groups.evaluate_pairwise_group_effect(
-                selected_property=selected_property, selected_groups=selected_groups)
-        except PigsGroupsError:
-            return None
-        else:
-            return p_values
+        p_values = self._pigs_groups.evaluate_pairwise_group_effect(selected_property=selected_property, selected_groups=selected_groups)
+        return p_values
 
     def evaluate_global_time_effect(self, selected_property='APs', selected_groups=None):
         """
         """
 
         p_values = self._pigs_groups.evaluate_global_time_effect(selected_property=selected_property, selected_groups=selected_groups)
-
         return p_values
 
     def evaluate_pairwise_time_effect(self, selected_property='APs', selected_groups=None):
         """
         """
 
-        valid_groups = self._pigs_groups.evaluate_pairwise_time_effect(selected_property=selected_property, selected_groups=selected_groups)
-
-        return valid_groups
+        p_values = self._pigs_groups.evaluate_pairwise_time_effect(selected_property=selected_property, selected_groups=selected_groups)
+        return p_values
 
     def add_group(self, group):
         """Add a group to the model.

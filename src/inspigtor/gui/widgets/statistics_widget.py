@@ -159,8 +159,12 @@ class StatisticsWidget(QtWidgets.QWidget):
         selected_property = self._main_window.selected_property
 
         global_effect = groups_model.evaluate_global_group_effect(selected_property=selected_property, selected_groups=groups_model.selected_groups)
+        if global_effect.empty:
+            return
 
         pairwise_effect = groups_model.evaluate_pairwise_group_effect(selected_property=selected_property, selected_groups=groups_model.selected_groups)
+        if not pairwise_effect:
+            return
 
         dialog = GroupEffectDialog(selected_property, global_effect, pairwise_effect, self)
         dialog.show()
@@ -179,7 +183,17 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('No groups defined yet')
             return
 
-        dialog = TimeEffectDialog(self._groups_list.model(), self)
+        selected_property = self._main_window.selected_property
+
+        global_effect = groups_model.evaluate_global_time_effect(selected_property=selected_property, selected_groups=groups_model.selected_groups)
+        if global_effect.empty:
+            return
+
+        pairwise_effect = groups_model.evaluate_pairwise_time_effect(selected_property=selected_property, selected_groups=groups_model.selected_groups)
+        if not pairwise_effect:
+            return
+
+        dialog = TimeEffectDialog(global_effect, pairwise_effect, self)
         dialog.show()
 
     def on_display_premortem_statistics(self):

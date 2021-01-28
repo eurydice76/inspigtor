@@ -6,6 +6,8 @@ import logging
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+import pandas as pd
+
 from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 
@@ -51,11 +53,12 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
 
         main_layout.addWidget(self._compute_premortem_statistics_button)
 
-        main_layout.addWidget(self._friedman_canvas, stretch=1)
-        main_layout.addWidget(self._friedman_toolbar, stretch=0)
+        friedman_layout = QtWidgets.QVBoxLayout()
+        friedman_groupbox_layout = QtWidgets.QVBoxLayout()
+        friedman_groupbox_layout.addWidget(self._friedman_table, stretch=1)
+        self._friedman_groupbox.setLayout(friedman_groupbox_layout)
 
         dunn_layout = QtWidgets.QVBoxLayout()
-
         dunn_groupbox_layout = QtWidgets.QVBoxLayout()
         selected_group_layout = QtWidgets.QHBoxLayout()
         selected_group_layout.addWidget(self._selected_group_label)
@@ -64,8 +67,10 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
         dunn_groupbox_layout.addWidget(self._dunn_table, stretch=2)
         self._dunn_groupbox.setLayout(dunn_groupbox_layout)
 
+        friedman_layout.addWidget(self._friedman_groupbox)
         dunn_layout.addWidget(self._dunn_groupbox)
 
+        main_layout.addLayout(friedman_layout, stretch=2)
         main_layout.addLayout(dunn_layout, stretch=2)
 
         self.setGeometry(0, 0, 600, 400)
@@ -85,12 +90,11 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
 
         self._compute_premortem_statistics_button = QtWidgets.QPushButton('Run')
 
-        self._friedman_figure = Figure()
-        self._friedman_axes = self._friedman_figure.add_subplot(111)
-        self._friedman_canvas = FigureCanvasQTAgg(self._friedman_figure)
-        self._friedman_toolbar = NavigationToolbar2QT(self._friedman_canvas, self)
+        self._friedman_groupbox = QtWidgets.QGroupBox('Global effect (Friedman test)')
 
-        self._dunn_groupbox = QtWidgets.QGroupBox('Dunn pairwise statistics')
+        self._friedman_table = CopyPastableTableView()
+
+        self._dunn_groupbox = QtWidgets.QGroupBox('Pairwise effect (Dunn test)')
 
         self._selected_group_label = QtWidgets.QLabel('Selected group')
 
@@ -119,11 +123,10 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
 
         selected_groups = self._groups_model.selected_groups
 
-        p_values = self._groups_model.premortem_statistics(n_last_intervals, selected_property=selected_property, selected_groups=selected_groups)
+        global_and_pairwise_effects = self._groups_model.premortem_statistics(n_last_intervals, selected_property=selected_property, selected_groups=selected_groups)
 
-        self._interval_indexes = dict(zip(p_values.keys(), [v[0] for v in p_values.values()]))
-        self._friedman_p_values = dict(zip(p_values.keys(), [v[1] for v in p_values.values()]))
-        self._dunn_p_values = dict(zip(p_values.keys(), [v[2] for v in p_values.values()]))
+        self._friedman_p_values = pd.DataFrame([v[0] for v in global_and_pairwise_effects.values()], index=selected_groups, columns=['p value'])
+        self._dunn_p_values = dict(zip(selected_groups, [v[1] for v in global_and_pairwise_effects.values()]))
 
         self.display_time_effect()
 
@@ -131,15 +134,10 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
         """Display the global time effect and the pairwise time effect.
         """
 
-        self._friedman_axes.clear()
-        self._friedman_axes.set_xlabel('groups')
-        self._friedman_axes.set_ylabel('Friedman p values')
-
-        self._friedman_axes.bar(self._friedman_p_values.keys(), self._friedman_p_values.values())
-
-        self._friedman_axes.axhline(y=0.05, color='r')
-
-        self._friedman_canvas.draw()
+        model = PValuesDataModel(self._friedman_p_values)
+        self._friedman_table.setModel(model)
+        for col in range(model.columnCount()):
+            self._friedman_table.horizontalHeader().setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
 
         self.on_select_group(0)
 
@@ -194,17 +192,6 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
             return
 
         p_values = self._dunn_p_values[selected_group]
-        # p_values is a squared data frame
-        n_rows, n_cols = p_values.shape
-
-        main_window = find_main_window()
-        interval_data = main_window.intervals_widget.interval_settings_label.data()
-        labels = range(1, n_rows+1) if interval_data is None else build_timeline(-10, int(interval_data[2]), self._interval_indexes[selected_group])
-
-        # p_values is a squared data frame
-        n_rows, n_cols = p_values.shape
-        p_values.index = labels
-        p_values.columns = labels
 
         model = PValuesDataModel(p_values)
 

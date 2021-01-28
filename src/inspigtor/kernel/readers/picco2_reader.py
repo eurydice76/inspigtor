@@ -125,6 +125,8 @@ class PiCCO2FileReader:
 
         self._record_intervals = []
 
+        self._record = None
+
     @ property
     def data(self):
         """Property for the data stored in the csv file
@@ -328,6 +330,19 @@ class PiCCO2FileReader:
         return self._parameters
 
     @property
+    def record(self):
+        """Return the current record intervals (if any).
+
+        Returns:
+            int: the record interval value in minutes.
+        """
+
+        if self._record is not None:
+            return self._record//60
+        else:
+            return self._record
+
+    @property
     def record_intervals(self):
         """Return the current record intervals (if any).
 
@@ -465,9 +480,9 @@ class PiCCO2FileReader:
 if __name__ == '__main__':
 
     reader = PiCCO2FileReader(sys.argv[1])
-    # reader.set_record_interval(('00:00:00', '6:15:00', 2))
-    # print(reader.record_times)
-    # print(reader.t_initial_interval_index)
-    # print(reader.get_t_final_index())
-    # print(reader.timeline)
-    # print(reader.get_descriptive_statistics())
+    reader.set_record_interval(('00:00:00', '6:15:00', 2))
+    print(reader.record_times)
+    print(reader.t_initial_interval_index)
+    print(reader.get_t_final_index())
+    print(reader.timeline)
+    print(reader.get_descriptive_statistics())

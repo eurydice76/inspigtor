@@ -74,10 +74,11 @@ class PigsGroups:
             selected_groups = list(self._groups.keys())
         else:
             all_groups = set(self._groups.keys())
-            selected_groups = list(all_groups.intersection(selected_groups))
+            selected_groups = [group for group in selected_groups if group in all_groups]
 
         if len(selected_groups) < 2:
-            raise PigsGroupsError('There is less than two groups. Can not perform any global statistical test.')
+            logging.error('There is less than two groups. Can not perform any global statistical test.')
+            return pd.DataFrame([])
 
         longest_timeline = []
 
@@ -88,7 +89,8 @@ class PigsGroups:
                 timeline, averages_per_group[group] = self._groups[group].get_statistics(
                     selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
             except PigsPoolError as error:
-                raise PigsGroupsError from error
+                logging.error(str(error))
+                return pd.DataFrame([])
             else:
                 if len(timeline) > len(longest_timeline):
                     longest_timeline = timeline
@@ -96,13 +98,14 @@ class PigsGroups:
                 progress_bar.update(i+1)
 
         if not averages_per_group:
-            raise PigsGroupsError('There is less than two groups. Can not perform any global statistical test.')
+            logging.error('There is less than two groups. Can not perform any global statistical test.')
+            return pd.DataFrame([])
 
         progress_bar.reset(len(longest_timeline))
 
         p_values_per_time = []
         # Loop over the intervals
-        for i, time in enumerate(longest_timeline):
+        for i, _ in enumerate(longest_timeline):
             groups = []
             n_values_per_group = []
             uncomplete_group = False
@@ -161,7 +164,11 @@ class PigsGroups:
             selected_groups = list(self._groups.keys())
         else:
             all_groups = set(self._groups.keys())
-            selected_groups = list(all_groups.intersection(selected_groups))
+            selected_groups = [group for group in selected_groups if group in all_groups]
+
+        if not selected_groups:
+            logging.error('There is less than one group. Can not perform any global statistical test.')
+            return pd.DataFrame([])
 
         progress_bar.reset(len(selected_groups))
         valid_groups = []
@@ -178,7 +185,13 @@ class PigsGroups:
             finally:
                 progress_bar.update(i+1)
 
-        return valid_groups, p_values
+        if not p_values:
+            logging.error('The time effect could not be evaluated for any of the groups')
+            return pd.DataFrame([])
+
+        p_values = pd.DataFrame(p_values, index=valid_groups, columns=['p value'])
+
+        return p_values
 
     def evaluate_pairwise_group_effect(self, selected_property='APs', selected_groups=None, interval_indexes=None):
         """Performs a pairwise statistical test to check whether each pair of groups belongs to the same distribution.
@@ -203,10 +216,11 @@ class PigsGroups:
             selected_groups = list(self._groups.keys())
         else:
             all_groups = set(self._groups.keys())
-            selected_groups = list(all_groups.intersection(selected_groups))
+            selected_groups = [group for group in selected_groups if group in all_groups]
 
         if len(selected_groups) < 2:
-            raise PigsGroupsError('There is less than two groups. Can not perform any global statistical test.')
+            logging.error('There is less than two groups. Can not perform any global statistical test.')
+            return collections.OrderedDict()
 
         longest_timeline = []
         averages_per_group = collections.OrderedDict()
@@ -215,7 +229,8 @@ class PigsGroups:
                 timeline, averages_per_group[group] = self._groups[group].get_statistics(
                     selected_property, selected_statistics='mean', interval_indexes=interval_indexes)
             except PigsPoolError as error:
-                raise PigsGroupsError from error
+                logging.error(str(error))
+                return collections.OrderedDict()
             else:
                 if len(timeline) > len(longest_timeline):
                     longest_timeline = timeline
@@ -223,13 +238,15 @@ class PigsGroups:
         group_names = list(averages_per_group.keys())
 
         if not averages_per_group:
-            raise PigsGroupsError('There is less than two groups. Can not perform any global statistical test.')
+            logging.error('There is less than two groups. Can not perform any global statistical test.')
+            return collections.OrderedDict()
 
         progress_bar.reset(len(longest_timeline))
         p_values = collections.OrderedDict()
         # Loop over the intervals
         for i, time in enumerate(longest_timeline):
             uncomplete_group = False
+            groups = []
             for averages in averages_per_group.values():
                 # This interval is not defined for this group, skip the group
                 if i >= averages.shape[0]:
@@ -268,7 +285,11 @@ class PigsGroups:
             selected_groups = list(self._groups.keys())
         else:
             all_groups = set(self._groups.keys())
-            selected_groups = list(all_groups.intersection(selected_groups))
+            selected_groups = [group for group in selected_groups if group in all_groups]
+
+        if not selected_groups:
+            logging.error('There is less than one group. Can not perform any global statistical test.')
+            return collections.OrderedDict()
 
         progress_bar.reset(len(selected_groups))
         valid_groups = collections.OrderedDict()
@@ -300,7 +321,7 @@ class PigsGroups:
             selected_groups = list(self._groups.keys())
         else:
             all_groups = set(self._groups.keys())
-            selected_groups = list(all_groups.intersection(selected_groups))
+            selected_groups = [group for group in selected_groups if group in all_groups]
 
         workbook = openpyxl.Workbook()
         # Remove the first empty sheet created by default
@@ -372,16 +393,21 @@ class PigsGroups:
             selected_groups = list(self._groups.keys())
         else:
             all_groups = set(self._groups.keys())
-            selected_groups = list(all_groups.intersection(selected_groups))
+            selected_groups = [group for group in selected_groups if group in all_groups]
+
+        if not selected_groups:
+            logging.error('There is less than one group. Can not perform any global statistical test.')
+            return collections.OrderedDict()
 
         progress_bar.reset(len(selected_groups))
-        p_values = []
+        global_and_pairwise_effects = []
         for i, group in enumerate(selected_groups):
-            p_value = self._groups[group].premortem_statistics(n_last_intervals, selected_property=selected_property)
-            p_values.append(p_value)
+            p_values = self._groups[group].premortem_statistics(n_last_intervals, selected_property=selected_property)
+            friedmann_p_value, dunn_p_values = p_values
+            global_and_pairwise_effects.append((friedmann_p_value, dunn_p_values))
             progress_bar.update(i+1)
 
-        return dict(zip(selected_groups, p_values))
+        return collections.OrderedDict(zip(selected_groups, global_and_pairwise_effects))
 
     def remove_reader(self, filename):
         """
@@ -404,25 +430,3 @@ class PigsGroups:
         for pool in self._groups.values():
 
             pool.set_record_interval(interval)
-
-
-if __name__ == '__main__':
-
-    import sys
-    from inspigtor.kernel.pigs.pigs_pool import PigsPool
-
-    pool1 = PigsPool()
-    pool1.add_reader(sys.argv[1])
-    pool1.add_reader(sys.argv[2])
-
-    pool2 = PigsPool()
-    pool2.add_reader(sys.argv[1])
-    pool2.add_reader(sys.argv[2])
-
-    groups = PigsGroups()
-    groups.add_group('group1', pool1)
-    groups.add_group('group2', pool2)
-    groups.set_record_interval(('00:00:00', '01:00:00', 300, 30))
-    print(groups.evaluate_global_group_effect('APs'))
-    print(groups.evaluate_pairwise_group_effect('APs'))
-    groups.export_statistics('test.xlsx', selected_property='APs')

@@ -130,7 +130,7 @@ class PigsPool:
             reduce (list of str): the list statistical functions used to reduce the output over axis=1
 
         Returns:
-            numpy.array: array which contain the sttaistics for each interval for each pig (row = number of intervals and columns = number of pigs)
+            numpy.array: array which contain the statistics for each interval for each pig (row = number of intervals and columns = number of pigs)
 
         Raises:
             PigsPoolError: if the selected statistics is not valid.
@@ -240,13 +240,17 @@ class PigsPool:
 
         averages = []
 
+        record = None
+
         for reader in self.pigs.values():
+
+            record = reader.record
 
             t_initial_interval_index = reader.t_initial_interval_index
             t_final_interval_index = reader.t_final_interval_index
 
             # These are the intervals used for the analysis
-            interval_indexes = [t_initial_interval_index - 1] + list(range(t_final_interval_index-n_last_intervals+1, t_final_interval_index+1))
+            interval_indexes = [t_initial_interval_index] + list(range(t_final_interval_index-n_last_intervals+1, t_final_interval_index+1))
 
             try:
                 descriptive_statistics = reader.get_descriptive_statistics(selected_property, selected_statistics=['mean'], interval_indexes=interval_indexes)
@@ -256,6 +260,12 @@ class PigsPool:
 
             averages.append(descriptive_statistics['mean'])
 
+        if record is None:
+            logging.error('No record interval defined')
+            return (np.nan, pd.DataFrame([]))
+
+        times = ['t_initial'] + ['t_final ({:d})'.format(record*i) for i in range(-n_last_intervals+1, 1)]
+
         # Transpose the nested list such as the number rows is the number of intervals and the number of columns is the number of individuals
         averages = [list(x) for x in zip(*averages)]
 
@@ -264,7 +274,10 @@ class PigsPool:
         data_frame = data_frame.round(4)
         dunn_statistics = data_frame
 
-        return interval_indexes, friedman_statistics, dunn_statistics
+        dunn_statistics.index = times
+        dunn_statistics.columns = times
+
+        return friedman_statistics, dunn_statistics
 
     def set_record_interval(self, interval):
         """Set the record interval.

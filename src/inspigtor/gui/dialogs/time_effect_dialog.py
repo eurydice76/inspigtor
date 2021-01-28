@@ -16,13 +16,15 @@ class TimeEffectDialog(QtWidgets.QDialog):
     """
     """
 
-    def __init__(self, groups_model, parent=None):
+    def __init__(self, global_effect, pairwise_effect, parent=None):
         """
         """
 
         super(TimeEffectDialog, self).__init__(parent)
 
-        self._groups_model = groups_model
+        self._global_effect = global_effect
+
+        self._pairwise_effect = pairwise_effect
 
         self.init_ui()
 
@@ -38,11 +40,13 @@ class TimeEffectDialog(QtWidgets.QDialog):
 
         main_layout = QtWidgets.QVBoxLayout()
 
-        main_layout.addWidget(self._friedman_canvas, stretch=1)
-        main_layout.addWidget(self._friedman_toolbar, stretch=0)
+        friedman_layout = QtWidgets.QVBoxLayout()
+        friedman_groupbox_layout = QtWidgets.QVBoxLayout()
+        friedman_groupbox_layout.addWidget(self._friedman_table, stretch=1)
+        self._friedman_groupbox.setLayout(friedman_groupbox_layout)
+        friedman_layout.addWidget(self._friedman_groupbox)
 
         dunn_layout = QtWidgets.QVBoxLayout()
-
         dunn_groupbox_layout = QtWidgets.QVBoxLayout()
         selected_group_layout = QtWidgets.QHBoxLayout()
         selected_group_layout.addWidget(self._selected_group_label)
@@ -50,9 +54,9 @@ class TimeEffectDialog(QtWidgets.QDialog):
         dunn_groupbox_layout.addLayout(selected_group_layout)
         dunn_groupbox_layout.addWidget(self._dunn_table, stretch=2)
         self._dunn_groupbox.setLayout(dunn_groupbox_layout)
-
         dunn_layout.addWidget(self._dunn_groupbox)
 
+        main_layout.addLayout(friedman_layout, stretch=2)
         main_layout.addLayout(dunn_layout, stretch=2)
 
         self.setGeometry(0, 0, 600, 400)
@@ -63,17 +67,13 @@ class TimeEffectDialog(QtWidgets.QDialog):
         """Build the widgets.
         """
 
-        self._friedman_figure = Figure()
-        self._friedman_axes = self._friedman_figure.add_subplot(111)
-        self._friedman_canvas = FigureCanvasQTAgg(self._friedman_figure)
-        self._friedman_toolbar = NavigationToolbar2QT(self._friedman_canvas, self)
+        self._friedman_groupbox = QtWidgets.QGroupBox('Global effect (Friedman test)')
 
-        self._dunn_groupbox = QtWidgets.QGroupBox('Dunn pairwise statistics')
+        self._friedman_table = CopyPastableTableView()
 
+        self._dunn_groupbox = QtWidgets.QGroupBox('Pairwise effect (Dunn test)')
         self._selected_group_label = QtWidgets.QLabel('Selected group')
-
         self._selected_group_combo = QtWidgets.QComboBox()
-
         self._dunn_table = CopyPastableTableView()
         self._dunn_table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self._dunn_table.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
@@ -83,32 +83,14 @@ class TimeEffectDialog(QtWidgets.QDialog):
         """Display the global time effect and the pairwise time effect.
         """
 
-        self._friedman_axes.clear()
-        self._friedman_axes.set_xlabel('groups')
-        self._friedman_axes.set_ylabel('Friedman p values')
-
-        main_window = find_main_window()
-
-        selected_property = main_window.selected_property
-
-        selected_groups = self._groups_model.selected_groups
-
-        valid_groups, p_values = self._groups_model.evaluate_global_time_effect(
-            selected_property=selected_property, selected_groups=selected_groups)
-        if not p_values:
-            return
-
-        self._friedman_axes.axhline(y=0.05, color='r')
-
-        self._friedman_axes.bar(valid_groups, p_values)
-
-        self._friedman_canvas.draw()
-
-        valid_groups = self._groups_model.evaluate_pairwise_time_effect(selected_property=selected_property, selected_groups=selected_groups)
+        model = PValuesDataModel(self._global_effect)
+        self._friedman_table.setModel(model)
+        for col in range(model.columnCount()):
+            self._friedman_table.horizontalHeader().setSectionResizeMode(col, QtWidgets.QHeaderView.ResizeToContents)
 
         self._selected_group_combo.clear()
-        self._selected_group_combo.addItems(valid_groups.keys())
-        for i, p_values in enumerate(valid_groups.values()):
+        self._selected_group_combo.addItems(self._pairwise_effect.keys())
+        for i, p_values in enumerate(self._pairwise_effect.values()):
             self._selected_group_combo.setItemData(i, p_values)
 
         self._selected_group_combo.currentIndexChanged.connect(self.on_select_group)
