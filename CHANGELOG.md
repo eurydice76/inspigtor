@@ -1,3 +1,7 @@
+version 0.0.8
+--------------
+* FIXED   various fixes
+
 version 0.0.7
 --------------
 * UPDATED refactored premortem analysis with real time units
