@@ -52,6 +52,16 @@ class PigsPool:
 
         return self._pigs.get(filename, None)
 
+    def has_defined_intervals(self):
+        """Check whether intervals have been defined for this pool.
+        """
+
+        record = None
+        for pig in self._pigs.values():
+            record = pig.record
+
+        return record is not None
+
     def evaluate_global_time_effect(self, selected_property='APs', interval_indexes=None):
         """Performs a Friedman statistical test to check whether the averages defined for each pig over record intervals
         belongs to the same distribution.
@@ -191,7 +201,7 @@ class PigsPool:
             PigsPoolError: if the selected statistics is not valid.
         """
 
-        statistics = self.get_statistics(selected_property, selected_statistics, interval_indexes)
+        _, statistics = self.get_statistics(selected_property, selected_statistics, interval_indexes)
 
         available_statistics_functions = set(statistical_functions.keys())
         output_statistics = list(available_statistics_functions.intersection(output_statistics))

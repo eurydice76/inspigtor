@@ -13,7 +13,6 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationTool
 
 from inspigtor.gui.dialogs.dunn_matrix_dialog import DunnMatrixDialog
 from inspigtor.gui.models.pvalues_data_model import PValuesDataModel
-from inspigtor.gui.utils.helper_functions import find_main_window
 from inspigtor.gui.views.copy_pastable_tableview import CopyPastableTableView
 from inspigtor.kernel.utils.helper_functions import build_timeline
 
@@ -22,9 +21,11 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
     """This class implements the dialog for premortem analysis.
     """
 
-    def __init__(self, groups_model, parent=None):
+    def __init__(self, selected_property, groups_model, parent=None):
 
         super(PreMortemStatisticsDialog, self).__init__(parent)
+
+        self._selected_property = selected_property
 
         self._groups_model = groups_model
 
@@ -81,6 +82,8 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
         """Build the widgets.
         """
 
+        self.setWindowTitle('Premortem statistics for {} property'.format(self._selected_property))
+
         self._n_last_intervals_label = QtWidgets.QLabel('Number of (last) intervals')
 
         self._n_last_intervals_spinbox = QtWidgets.QSpinBox()
@@ -117,13 +120,9 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
 
         n_last_intervals = self._n_last_intervals_spinbox.value()
 
-        main_window = find_main_window()
-
-        selected_property = main_window.selected_property
-
         selected_groups = self._groups_model.selected_groups
 
-        global_and_pairwise_effects = self._groups_model.premortem_statistics(n_last_intervals, selected_property=selected_property, selected_groups=selected_groups)
+        global_and_pairwise_effects = self._groups_model.premortem_statistics(n_last_intervals, selected_property=self._selected_property, selected_groups=selected_groups)
 
         self._friedman_p_values = pd.DataFrame([v[0] for v in global_and_pairwise_effects.values()], index=selected_groups, columns=['p value'])
         self._dunn_p_values = dict(zip(selected_groups, [v[1] for v in global_and_pairwise_effects.values()]))
@@ -159,22 +158,13 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
         if model is None:
             return
 
-        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Export table as ...')
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Export table as ...', filter='Excel files (*.xls *.xlsx)')
         if not filename:
             return
 
         try:
-            with open(filename, 'w') as fout:
-                for i in range(model.rowCount()):
-                    line = []
-                    for j in range(model.columnCount()):
-                        index = model.index(i, j)
-                        data = model.data(index, QtCore.Qt.DisplayRole)
-                        line.append(data)
-                    line = ';'.join(line)
-                    fout.write(line)
-                    fout.write('\n')
-        except PermissionError:
+            model.matrix().to_excel(filename)
+        except:
             logging.error('Can not open file {} for writing.'.format(filename))
 
     def on_select_group(self, selected_group):
@@ -205,7 +195,7 @@ class PreMortemStatisticsDialog(QtWidgets.QDialog):
         if model is None:
             return
 
-        dialog = DunnMatrixDialog(model, self)
+        dialog = DunnMatrixDialog(model.matrix(), self)
         dialog.show()
 
     def on_show_dunn_table_menu(self, point):

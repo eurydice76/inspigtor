@@ -113,15 +113,15 @@ class PigsGroups:
                 # This interval is not defined for this group, skip the group
                 if i >= averages.shape[0]:
                     uncomplete_group = True
-                    n_values_per_group.append(0)
+                    n_values_per_group.append((np.nan, np.nan, 0))
                 else:
                     values = [v for v in averages[i, :] if not np.isnan(v)]
                     if not values:
                         uncomplete_group = True
-                        n_values_per_group.append(0)
+                        n_values_per_group.append((np.nan, np.nan, 0))
                     else:
                         groups.append(values)
-                        n_values_per_group.append(len(values))
+                        n_values_per_group.append((np.nanmean(values), np.nanstd(values), len(values)))
 
             if uncomplete_group:
                 p_value = np.nan
@@ -135,11 +135,14 @@ class PigsGroups:
                     else:
                         p_value = stats.kruskal(*groups).pvalue
 
+            n_values_per_group = [vv for v in n_values_per_group for vv in v]
+
             p_values_per_time.append(n_values_per_group + [p_value])
 
             progress_bar.update(i+1)
 
         group_names = list(averages_per_group.keys())
+        group_names = [vv for v in zip(group_names, group_names, group_names) for vv in v]
         columns = group_names + ['p value']
         p_values = pd.DataFrame(p_values_per_time, index=longest_timeline, columns=columns)
 
@@ -384,6 +387,16 @@ class PigsGroups:
         """
 
         return self._groups
+
+    def has_defined_intervals(self):
+        """Check whether this group has defined intervals
+        """
+
+        for pig_pool in self._groups.values():
+            if not pig_pool.has_defined_intervals():
+                return False
+
+        return True
 
     def premortem_statistics(self, n_last_intervals, selected_property='APs', selected_groups=None):
         """

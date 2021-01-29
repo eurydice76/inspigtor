@@ -27,6 +27,12 @@ class PigsGroupsModel(QtCore.QAbstractListModel):
 
         self._selected_groups = []
 
+    def has_defined_intervals(self):
+        """Check whether this group has defined intervals
+        """
+
+        return self._pigs_groups.has_defined_intervals()
+
     @property
     def pigs_groups(self):
         """

@@ -22,6 +22,10 @@ class PValuesDataModel(QtCore.QAbstractTableModel):
         super(PValuesDataModel, self).__init__()
         self._data = data
 
+    def matrix(self):
+
+        return self._data
+
     def rowCount(self, parent=None):
         """Returns the number of rows of the underlying p value matrix.
         """

@@ -1,5 +1,7 @@
 import logging
 
+import pandas as pd
+
 from PyQt5 import QtWidgets
 
 import matplotlib.ticker as ticker
@@ -10,7 +12,7 @@ from pylab import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 
 from inspigtor.gui.models.pvalues_data_model import PValuesDataModel
-from inspigtor.gui.utils.helper_functions import find_main_window, func_formatter
+from inspigtor.gui.utils.helper_functions import func_formatter
 from inspigtor.gui.utils.navigation_toolbar import NavigationToolbarWithExportButton
 from inspigtor.gui.views.copy_pastable_tableview import CopyPastableTableView
 from inspigtor.kernel.pigs.pigs_groups import PigsGroupsError
@@ -42,6 +44,7 @@ class GroupEffectDialog(QtWidgets.QDialog):
 
         self._selected_time.currentIndexChanged.connect(self.on_select_time)
         self._plot_button.clicked.connect(self.on_display_p_value_plot)
+        self._export_all_button.clicked.connect(self.on_export_all)
 
     def build_layout(self):
         """Build the layout.
@@ -65,6 +68,8 @@ class GroupEffectDialog(QtWidgets.QDialog):
         self._pairwise_effect_groupbox.setLayout(pairwise_effect_groupbox_layout)
         main_layout.addWidget(self._pairwise_effect_groupbox)
 
+        main_layout.addWidget(self._export_all_button)
+
         self.setGeometry(0, 0, 600, 600)
 
         self.setLayout(main_layout)
@@ -73,8 +78,7 @@ class GroupEffectDialog(QtWidgets.QDialog):
         """Build and/or initialize the widgets of the dialog.
         """
 
-        main_window = find_main_window()
-        self.setWindowTitle('Group effect statistics for {} property'.format(main_window.selected_property))
+        self.setWindowTitle('Group effect statistics for {} property'.format(self._selected_property))
 
         self._global_effect_groupbox = QtWidgets.QGroupBox('Global effect (Mann-Whitney/Kruskal-Wallis test)')
 
@@ -100,6 +104,8 @@ class GroupEffectDialog(QtWidgets.QDialog):
         self._selected_group_2.addItems(self._pairwise_effect[first_time].columns)
 
         self._plot_button = QtWidgets.QPushButton('Plot')
+
+        self._export_all_button = QtWidgets.QPushButton('Export all')
 
     def init_ui(self):
         """Initialiwes the dialog.
@@ -154,6 +160,22 @@ class GroupEffectDialog(QtWidgets.QDialog):
         canvas.draw()
 
         plot_widget.show()
+
+    def on_export_all(self):
+        """Export global and local effects in a excel file
+        """
+
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Export statistics as ...', filter="Excel files (*.xls *.xlsx)")
+        if not filename:
+            return
+
+        try:
+            with pd.ExcelWriter(filename) as writer:
+                self._global_effect.to_excel(writer, sheet_name='global effect')
+                for k, v in self._pairwise_effect.items():
+                    v.to_excel(writer, sheet_name=k)
+        except:
+            logging.error('Can not open file {} for writing.'.format(filename))
 
     def on_select_time(self, index):
         """Event handler called when the user select a different time from the time selection combo box.

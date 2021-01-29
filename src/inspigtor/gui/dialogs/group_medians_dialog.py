@@ -95,7 +95,7 @@ class GroupMediansDialog(QtWidgets.QDialog):
         if len(pigs_pool) == 0:
             return
 
-        individual_averages = pigs_pool.get_statistics(self._selected_property)
+        _, individual_averages = pigs_pool.get_statistics(self._selected_property)
         individual_averages = [[v for v in row if not np.isnan(v)] for row in individual_averages]
 
         # If there is already a plot, remove it

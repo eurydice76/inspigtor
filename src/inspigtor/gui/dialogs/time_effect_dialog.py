@@ -16,11 +16,13 @@ class TimeEffectDialog(QtWidgets.QDialog):
     """
     """
 
-    def __init__(self, global_effect, pairwise_effect, parent=None):
+    def __init__(self, selected_property, global_effect, pairwise_effect, parent=None):
         """
         """
 
         super(TimeEffectDialog, self).__init__(parent)
+
+        self._selected_property = selected_property
 
         self._global_effect = global_effect
 
@@ -67,6 +69,8 @@ class TimeEffectDialog(QtWidgets.QDialog):
         """Build the widgets.
         """
 
+        self.setWindowTitle('Time effect statistics for {} property'.format(self._selected_property))
+
         self._friedman_groupbox = QtWidgets.QGroupBox('Global effect (Friedman test)')
 
         self._friedman_table = CopyPastableTableView()
@@ -109,7 +113,7 @@ class TimeEffectDialog(QtWidgets.QDialog):
         self.display_time_effect()
 
     def on_export_dunn_table(self):
-        """Export the current Dunn table to a csv file.
+        """Export the current Dunn table to a excel file.
         """
 
         model = self._dunn_table.model()
@@ -120,12 +124,10 @@ class TimeEffectDialog(QtWidgets.QDialog):
         if not filename:
             return
 
-        filename_noext, ext = os.path.splitext(filename)
-        if ext not in ['.xls', '.xlsx']:
-            logging.warning('Bad file extension for output excel file {}. It will be replaced by ".xlsx"'.format(filename))
-            filename = filename_noext + '.xlsx'
-
-        model.export(filename)
+        try:
+            model.matrix().to_excel(filename)
+        except:
+            logging.error('Can not open file {} for writing.'.format(filename))
 
     def on_select_group(self, selected_group):
         """Event fired when the user change of group for showing the corresponding Dunn matrix.
@@ -148,7 +150,7 @@ class TimeEffectDialog(QtWidgets.QDialog):
         if model is None:
             return
 
-        dialog = DunnMatrixDialog(model, self)
+        dialog = DunnMatrixDialog(model.matrix(), self)
         dialog.show()
 
     def on_show_dunn_table_menu(self, point):

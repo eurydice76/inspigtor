@@ -120,6 +120,10 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('No group defined yet')
             return
 
+        if not groups_model.has_defined_intervals():
+            logging.error('No intervals defined yet for selected groups')
+            return
+
         dialog = GroupAveragesDialog(self._main_window.selected_property, self._groups_list.model(), self)
         dialog.show()
 
@@ -137,6 +141,10 @@ class StatisticsWidget(QtWidgets.QWidget):
         groups_model = self._groups_list.model()
         if groups_model.rowCount() == 0:
             logging.warning('No group defined yet')
+            return
+
+        if not groups_model.has_defined_intervals():
+            logging.error('No intervals defined yet for selected groups')
             return
 
         dialog = GroupMediansDialog(self._main_window.selected_property, self._groups_list.model(), self)
@@ -193,7 +201,7 @@ class StatisticsWidget(QtWidgets.QWidget):
         if not pairwise_effect:
             return
 
-        dialog = TimeEffectDialog(global_effect, pairwise_effect, self)
+        dialog = TimeEffectDialog(selected_property, global_effect, pairwise_effect, self)
         dialog.show()
 
     def on_display_premortem_statistics(self):
@@ -210,7 +218,9 @@ class StatisticsWidget(QtWidgets.QWidget):
             logging.warning('No groups defined yet')
             return
 
-        dialog = PreMortemStatisticsDialog(self._groups_list.model(), self)
+        selected_property = self._main_window.selected_property
+
+        dialog = PreMortemStatisticsDialog(selected_property, self._groups_list.model(), self)
         dialog.show()
 
     def on_export_group_statistics(self):
@@ -227,6 +237,10 @@ class StatisticsWidget(QtWidgets.QWidget):
         pigs_groups_model = self._groups_list.model()
         if pigs_groups_model.rowCount() == 0:
             logging.warning('No group defined yet')
+            return
+
+        if not pigs_groups_model.has_defined_intervals():
+            logging.error('No intervals defined yet for selected groups')
             return
 
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, caption='Export statistics as ...', filter="Excel files (*.xls *.xlsx)")
