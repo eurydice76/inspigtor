@@ -48,12 +48,12 @@ class PiCCO2FileReader:
         # Read the second line which contains the titles of the general parameters
         line = csv_file.readline().strip()
         line = line[:-1] if line.endswith(';') else line
-        general_info_fields = [v.strip() for v in line.split(';') if v.strip()]
+        general_info_fields = [v.strip() for v in line.split(';')]
 
         # Read the third line which contains the values of the general parameters
         line = csv_file.readline().strip()
         line = line[:-1] if line.endswith(';') else line
-        general_info = [v.strip() for v in line.split(';') if v.strip()]
+        general_info = [v.strip() for v in line.split(';')]
 
         # Create a dict out of those parameters
         general_info_dict = collections.OrderedDict(zip(general_info_fields, general_info))
@@ -80,8 +80,19 @@ class PiCCO2FileReader:
         # Concatenate the pig id parameters dict and the general parameters dict
         self._parameters = {**pig_id_dict, **general_info_dict}
 
+        csv_file.close()
+
+        # Reopen the file to guess size of the header
+        csv_file = open(self._filename, 'r')
+
+        header_size = 0
+        while not csv_file.readline().startswith('Date;Time'):
+            header_size += 1
+
+        csv_file.close()
+
         # Read the rest of the file as a csv file
-        self._data = pd.read_csv(self._filename, sep=';', skiprows=7, skipfooter=1, engine='python')
+        self._data = pd.read_csv(self._filename, sep=';', skiprows=header_size, skipfooter=1, engine='python')
 
         # For some files, times are not written in chronological order, so sort them before doing anything
         self._data = self._data.sort_values(by=['Time'])
@@ -120,8 +131,6 @@ class PiCCO2FileReader:
 
         # Add a column to the original data which show the delta t regarding t_zero - 10 minutes
         self._data.insert(loc=2, column='delta_t', value=delta_ts)
-
-        csv_file.close()
 
         self._record_intervals = []
 
