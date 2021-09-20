@@ -4,7 +4,7 @@ ROOT_DIR=$(pwd)
 
 VERSION=$1
 
-PYTHON_VERSION=3.8
+PYTHON_VERSION=$2
 
 git checkout ${VERSION}
 
