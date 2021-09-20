@@ -1,0 +1,10 @@
+# inspigtor
+
+inspigtor is a PyQt based GUI application used to perform statistical analysis of 
+physiological parameters which monitor the state of pigs which undergo neurotoxic 
+intoxication. As such, it is used to reveal significant time-based or 
+intoxication-based effects on groups of pigs.  
+
+## Installation
+
+pip install inspigtor

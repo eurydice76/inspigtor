@@ -5,25 +5,25 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleDisplayName</key>
-	<string>inspigtor</string>
+	<string>MDANSE</string>
 	<key>CFBundleExecutable</key>
-	<string>inspigtor</string>
+	<string>MDANSE</string>
 	<key>CFBundleIconFile</key>
-	<string>inspigtor.icns</string>
+	<string>mdanse.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>eu.ill.inspigtor-<inspigtor_version></string>
+	<string>eu.ill.MDANSE-<MDANSE_VERSION></string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>inspigtor</string>
+	<string>MDANSE</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string><inspigtor_version></string>
+	<string><MDANSE_VERSION></string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string><inspigtor_version></string>
+	<string><MDANSE_VERSION></string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.science</string>
 	<key>LSHasLocalizedDisplayName</key>
