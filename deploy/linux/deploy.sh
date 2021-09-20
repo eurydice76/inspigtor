@@ -1,18 +1,22 @@
 #!/bin/bash
 
-if [[ $GITHUB_REF == refs/heads/* ]] ;
-then
-    VERSION=${GITHUB_REF#refs/heads/}
-else
-	if [[ $GITHUB_REF == refs/tags/* ]] ;
-	then
-		VERSION=${GITHUB_REF#refs/tags/}
-	else
-		exit 1
-	fi
-fi
+ROOT_DIR=$(pwd)
 
-source .env/bin/activate
+VERSION=$1
+
+PYTHON_VERSION=3.8
+
+git checkout ${VERSION}
+
+rm -rf ./.env
+
+virtualenv -p python${PYTHON_VERSION} ./env
+
+source ./env/bin/activate
+
+pip install appimage-builder
+
+pip install .
 
 cd deploy/linux
 
@@ -24,4 +28,4 @@ sed -i "s/version: 0.0.0/version: ${VERSION}/g" AppImageBuilder.yml
 # Run app builder
 appimage-builder
 
-mv inspigtor-*-x86_64.AppImage ${GITHUB_WORKSPACE}
+mv inspigtor-*-x86_64.AppImage ${ROOT_DIR}

@@ -1,20 +1,26 @@
 #!/bin/bash
 
-#############################
-# Create DMG
-#############################
+VERSION=$1
 
-if [[ $GITHUB_REF == refs/heads/* ]] ;
-then
-    VERSION=${GITHUB_REF#refs/heads/}
-else
-	if [[ $GITHUB_REF == refs/tags/* ]] ;
-	then
-		VERSION=${GITHUB_REF#refs/tags/}
-	else
-		exit 1
-	fi
-fi
+git checkout $VERSION
+
+rm -rf ./.env
+
+rm -rf ./build
+
+rm -rf ./dist
+
+rm inspigtor*dmg
+
+virtualenv -p python3 ./.env
+
+source ./.env/bin/activate
+
+pip install .
+
+pip install py2app
+
+python3 setup.py py2app --packages cffi
 
 INSPIGTOR_DMG=inspigtor-${VERSION}-macOS-amd64.dmg
 hdiutil unmount /Volumes/inspigtor -force -quiet
