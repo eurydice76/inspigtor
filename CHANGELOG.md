@@ -1,3 +1,7 @@
+version 0.0.9
+--------------
+* UPDATED changed the file hierarchy
+
 version 0.0.8
 --------------
 * FIXED   various fixes
